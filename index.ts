@@ -6,7 +6,9 @@ import { groqService } from './providers/groq/service';
 import { setupQianFanEnvironment } from './providers/qianfan/client';
 import { qianfanService } from './providers/qianfan/service';
 import type { QAItem, Question } from './types/types';
+import type { AnswerWorkerTask, QuestionWorkerTask } from './types/worker';
 import { isTooSimilar } from './utils/similarity';
+import { WorkerPool } from './workers/worker-pool';
 
 // MARK: - Question Generation Pipeline
 /**
@@ -236,6 +238,127 @@ async function main_answers(
 }
 
 /**
+ * Main entry point for parallel question generation
+ */
+async function main_questions_parallel(
+  questionCount: number,
+  region: Region,
+  workerCount: number = Math.max(1, navigator.hardwareConcurrency - 1)
+) {
+  console.log(`Generating questions for ${region.name} using ${workerCount} workers...`);
+  
+  const questionPool = new WorkerPool(workerCount, './workers/question-worker.ts');
+  const batchSize = Math.ceil(questionCount / workerCount);
+  const tasks: Promise<Question[]>[] = [];
+
+  // Distribute work among workers
+  for (let i = 0; i < workerCount; i++) {
+    const task: QuestionWorkerTask = {
+      regionName: region.name,
+      batchSize: Math.min(batchSize, questionCount - i * batchSize),
+      maxAttempts: 3,
+      workerId: i + 1
+    };
+    tasks.push(questionPool.execute(task));
+  }
+
+  try {
+    // Wait for all workers to complete
+    const results = await Promise.all(tasks);
+    
+    // Combine results
+    const allQuestions = results.flat();
+    console.log(`Generated ${allQuestions.length} questions in parallel`);
+    
+    return allQuestions;
+  } finally {
+    questionPool.terminate();
+  }
+}
+
+/**
+ * Main entry point for parallel answer generation
+ */
+async function main_answers_parallel(
+  questions: Question[],
+  workerCount: number = Math.max(1, navigator.hardwareConcurrency - 1),
+  options: { maxAttempts: number; batchDelay: number; batchSize: number },
+  regionPinyin: string
+) {
+  console.log(`Generating answers using ${workerCount} workers...`);
+  console.log(`Options: maxAttempts=${options.maxAttempts}, batchSize=${options.batchSize}, delay=${options.batchDelay}ms`);
+  
+  // Create worker status display
+  console.log('\nWorker Status:');
+  for (let i = 0; i < workerCount; i++) {
+    console.log(`Worker ${i + 1}: Initializing...`);
+  }
+  console.log('\n');  // Add extra line for separation
+  
+  const answerPool = new WorkerPool(workerCount, './workers/answer-worker.ts');
+  const unansweredQuestions = questions.filter(q => !q.is_answered);
+  const answers: QAItem[] = [];
+  
+  // Process questions in batches
+  for (let i = 0; i < unansweredQuestions.length; i += options.batchSize) {
+    const batchQuestions = unansweredQuestions.slice(i, i + options.batchSize);
+    console.log(`\nProcessing batch ${Math.floor(i / options.batchSize) + 1}/${Math.ceil(unansweredQuestions.length / options.batchSize)}`);
+
+    const batchPromises: Promise<QAItem>[] = batchQuestions.map((q, idx) => {
+      const workerId = (idx % workerCount) + 1;
+      const task: AnswerWorkerTask = {
+        question: q.question,
+        maxAttempts: options.maxAttempts,
+        workerId
+      };
+      return answerPool.execute<QAItem>(task);
+    });
+
+    try {
+      // Wait for current batch to complete
+      const batchAnswers = await Promise.all(batchPromises);
+      answers.push(...batchAnswers);
+      
+      // Update progress
+      console.log(`Completed ${answers.length}/${unansweredQuestions.length} answers`);
+      
+      // Save answers to file after each batch
+      const { qaFile } = getRegionFileNames(regionPinyin);
+      writeFileSync(qaFile, JSON.stringify(answers, null, 2), 'utf-8');
+      console.log(`Saved answers to ${qaFile}`);
+      
+      // Add delay between batches if not the last batch
+      if (i + options.batchSize < unansweredQuestions.length) {
+        console.log(`Waiting ${options.batchDelay}ms before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, options.batchDelay));
+      }
+    } catch (error) {
+      console.error(`Error processing batch:`, error);
+      // Continue with next batch even if current batch fails
+    }
+  }
+
+  try {
+    console.log(`\nGeneration complete!`);
+    console.log(`Generated ${answers.length} answers out of ${unansweredQuestions.length} questions`);
+    
+    // Update question status
+    questions.forEach(q => {
+      q.is_answered = answers.some(a => a.question === q.question);
+    });
+    
+    // Save updated questions
+    const { questionFile } = getRegionFileNames(regionPinyin);
+    writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
+    console.log(`Updated question status in ${questionFile}`);
+    
+    return answers;
+  } finally {
+    answerPool.terminate();
+  }
+}
+
+/**
  * Main application entry point
  */
 async function main() {
@@ -243,12 +366,48 @@ async function main() {
   const mode = process.argv[2];
   const regionPinyin = process.argv[3];
   
+  // Parse command line arguments
+  const args = process.argv.slice(4);
+  let options = {
+    workerCount: Math.max(1, navigator.hardwareConcurrency - 1),
+    maxAttempts: 3,
+    batchSize: 50,
+    delay: 1000, // delay between batches in ms
+  };
+
+  // Parse named arguments
+  for (let i = 0; i < args.length; i += 2) {
+    const key = args[i].replace('--', '');
+    const value = args[i + 1];
+    if (value) {
+      switch (key) {
+        case 'workers':
+          options.workerCount = parseInt(value);
+          break;
+        case 'attempts':
+          options.maxAttempts = parseInt(value);
+          break;
+        case 'batch':
+          options.batchSize = parseInt(value);
+          break;
+        case 'delay':
+          options.delay = parseInt(value);
+          break;
+      }
+    }
+  }
+  
   if (!mode || !['questions', 'answers', 'all'].includes(mode) || !regionPinyin) {
     console.error('Error: Please specify a valid mode and region');
     console.error('Usage:');
-    console.error('  For generating questions: bun run start -- questions <region_pinyin> [questionCount]');
-    console.error('  For generating answers: bun run start -- answers <region_pinyin> [maxAttempts]');
-    console.error('  For both questions and answers: bun run start -- all <region_pinyin> [questionCount]');
+    console.error('  For generating questions: bun run start -- questions <region_pinyin> [options]');
+    console.error('  For generating answers: bun run start -- answers <region_pinyin> [options]');
+    console.error('');
+    console.error('Options:');
+    console.error('  --workers <number>  Number of worker threads (default: CPU cores - 1)');
+    console.error('  --attempts <number> Maximum retry attempts (default: 3)');
+    console.error('  --batch <number>    Batch size for processing (default: 50)');
+    console.error('  --delay <number>    Delay between batches in ms (default: 1000)');
     process.exit(1);
   }
 
@@ -257,6 +416,9 @@ async function main() {
     console.error(`Error: Region "${regionPinyin}" not found`);
     process.exit(1);
   }
+
+  console.log(`Using ${provider.toUpperCase()} as AI provider`);
+  console.log('Options:', options);
 
   // Setup provider environment
   try {
@@ -282,13 +444,35 @@ async function main() {
 
   // Execute requested mode
   try {
-    if (mode === 'all' || mode === 'questions') {
-      const questionCount = parseInt(process.argv[4] || '10', 10);
-      await main_questions(questionCount, region, generateQuestionsFromPrompt);
+    let questions: Question[] = [];
+    
+    if (mode === 'questions' || mode === 'all') {
+      questions = await main_questions_parallel(100, region, options.workerCount);
+      console.log(`Generated ${questions.length} questions`);
+    } else if (mode === 'answers') {
+      // Load existing questions from file
+      const { questionFile } = getRegionFileNames(region.pinyin);
+      try {
+        questions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
+        console.log(`Loaded ${questions.length} questions from file`);
+      } catch (error) {
+        console.error('Error loading questions file:', error);
+        process.exit(1);
+      }
     }
     
-    if (mode === 'all' || mode === 'answers') {
-      await main_answers(region, generateAnswer);
+    if (mode === 'answers' || mode === 'all') {
+      const answers = await main_answers_parallel(
+        questions,
+        options.workerCount,
+        {
+          maxAttempts: options.maxAttempts,
+          batchDelay: options.delay,
+          batchSize: options.batchSize
+        },
+        regionPinyin
+      );
+      console.log(`Generated ${answers.length} answers`);
     }
   } catch (error) {
     console.error('Error executing requested mode:', error);

@@ -13,9 +13,9 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@baiducloud/qianfan": "^0.2.2",
     "@types/node": "^20.11.19",
-    "groq-sdk": "^0.15.0",
     "dotenv": "^16.4.4",
-    "@baiducloud/qianfan": "^0.2.2"
+    "groq-sdk": "^0.15.0"
   }
 }
