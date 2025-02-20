@@ -251,11 +251,31 @@ async function main_questions_parallel(
   const batchSize = Math.ceil(questionCount / workerCount);
   const tasks: Promise<Question[]>[] = [];
 
+  // Load existing questions first
+  const { questionFile } = getRegionFileNames(region.pinyin);
+  let existingQuestions: Question[] = [];
+  try {
+    existingQuestions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
+    console.log(`Loaded ${existingQuestions.length} existing questions`);
+  } catch (error) {
+    console.log('No existing questions found, starting fresh');
+  }
+
+  // Calculate remaining questions needed
+  const remainingCount = Math.max(0, questionCount - existingQuestions.length);
+  if (remainingCount === 0) {
+    console.log('Already have enough questions, no need to generate more');
+    return existingQuestions;
+  }
+
   // Distribute work among workers
-  for (let i = 0; i < workerCount; i++) {
+  for (let i = 0; i < workerCount && remainingCount > 0; i++) {
+    const workerBatchSize = Math.min(batchSize, remainingCount - i * batchSize);
+    if (workerBatchSize <= 0) break;
+
     const task: QuestionWorkerTask = {
       regionName: region.name,
-      batchSize: Math.min(batchSize, questionCount - i * batchSize),
+      batchSize: workerBatchSize,
       maxAttempts: 3,
       workerId: i + 1
     };
@@ -266,9 +286,23 @@ async function main_questions_parallel(
     // Wait for all workers to complete
     const results = await Promise.all(tasks);
     
-    // Combine results
-    const allQuestions = results.flat();
-    console.log(`Generated ${allQuestions.length} questions in parallel`);
+    // Combine and deduplicate results
+    const newQuestions = results.flat();
+    const allQuestions = [...existingQuestions];
+    const existingSet = new Set(existingQuestions.map(q => q.question));
+    
+    // Add new unique questions
+    for (const q of newQuestions) {
+      if (!existingSet.has(q.question) && !isTooSimilar(q.question, Array.from(existingSet), region.name)) {
+        allQuestions.push({ ...q, is_answered: false });
+        existingSet.add(q.question);
+      }
+    }
+
+    // Save combined results
+    writeFileSync(questionFile, JSON.stringify(allQuestions, null, 2), 'utf-8');
+    console.log(`Generated and saved ${allQuestions.length - existingQuestions.length} new questions`);
+    console.log(`Total questions in file: ${allQuestions.length}`);
     
     return allQuestions;
   } finally {

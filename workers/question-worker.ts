@@ -2,6 +2,7 @@ import { setupGroqEnvironment } from '../providers/groq/client';
 import { groqService } from '../providers/groq/service';
 import { setupQianFanEnvironment } from '../providers/qianfan/client';
 import { qianfanService } from '../providers/qianfan/service';
+import type { Question } from '../types/types';
 import type { QuestionWorkerTask } from '../types/worker';
 
 // Initialize the environment based on provider
@@ -22,16 +23,45 @@ if (provider === 'qianfan') {
  * Worker thread for generating questions
  */
 self.onmessage = async (e: MessageEvent<QuestionWorkerTask>) => {
-  const { regionName, batchSize, maxAttempts } = e.data;
+  const { regionName, batchSize, maxAttempts, workerId } = e.data;
   
   try {
+    console.log(`[Worker ${workerId}] Generating ${batchSize} questions for ${regionName}...`);
     const result = await service.generateQuestionsFromPrompt(regionName, batchSize, maxAttempts);
-    self.postMessage(result);
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      self.postMessage({ error: error.message });
-    } else {
-      self.postMessage({ error: 'An unknown error occurred' });
+    
+    try {
+      const parsedQuestions = JSON.parse(result) as Question[];
+      
+      if (!Array.isArray(parsedQuestions)) {
+        throw new Error('Parsed result is not an array');
+      }
+      
+      if (parsedQuestions.length === 0) {
+        throw new Error('No valid questions found in parsed result');
+      }
+      
+      // Validate and format each question
+      const validQuestions = parsedQuestions
+        .filter(q => q && typeof q.question === 'string' && q.question.trim().length > 0)
+        .map(q => ({
+          question: q.question.trim(),
+          is_answered: false
+        }));
+      
+      if (validQuestions.length === 0) {
+        throw new Error('No valid questions after filtering');
+      }
+      
+      console.log(`[Worker ${workerId}] Generated ${validQuestions.length} valid questions`);
+      self.postMessage(validQuestions);
+    } catch (parseError) {
+      console.error(`[Worker ${workerId}] Failed to parse questions:`, parseError);
+      console.error('Raw result:', result);
+      throw parseError;
     }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`[Worker ${workerId}] Error:`, errorMessage);
+    self.postMessage({ error: errorMessage });
   }
 }; 

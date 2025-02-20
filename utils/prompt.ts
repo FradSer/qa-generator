@@ -37,6 +37,33 @@ export function processQuestionResponse(text: string, regionName: string): strin
   console.log('├── Input Length:', text.length);
   console.log('└── Input Preview:', text.slice(0, 100).replace(/\n/g, '\\n') + (text.length > 100 ? '...' : ''));
   
+  // Try to extract JSON array first
+  try {
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const jsonStr = jsonMatch[0];
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed)) {
+        console.log('Found valid JSON array in response');
+        const validQuestions = parsed
+          .filter(q => q && typeof q === 'object' && typeof q.question === 'string')
+          .map(q => ({
+            question: q.question.trim(),
+            is_answered: false
+          }))
+          .filter(q => q.question.startsWith(`${regionName}本地`) && q.question.length >= 10);
+        
+        if (validQuestions.length > 0) {
+          const result = JSON.stringify(validQuestions, null, 2);
+          console.log(`\n✅ Processed ${validQuestions.length} valid questions from JSON`);
+          return result;
+        }
+      }
+    }
+  } catch (error) {
+    console.log('Failed to process as JSON, falling back to text processing');
+  }
+
   // Split into lines and clean up
   const lines = text.split(/[\n\r]+/).map(line => line.trim());
   console.log('\n📝 Line Processing');
@@ -48,7 +75,8 @@ export function processQuestionResponse(text: string, regionName: string): strin
     .filter(line => {
       const isValid = line && 
                      line.startsWith(`${regionName}本地`) && 
-                     (line.includes('？') || line.includes('?'));
+                     (line.includes('？') || line.includes('?')) &&
+                     line.length >= 10;
       if (!isValid && line.length > 0) {
         console.log('├── Filtered:', '❌');
         console.log('│   └── Invalid:', line);
@@ -68,9 +96,9 @@ export function processQuestionResponse(text: string, regionName: string): strin
       return formatted;
     })
     .filter((line, index, self) => {
-      const isUnique = self.indexOf(line) === index && line.length >= 10;
+      const isUnique = self.indexOf(line) === index;
       if (!isUnique) {
-        console.log('├── Duplicate/Short:', '🔄');
+        console.log('├── Duplicate:', '🔄');
         console.log('│   └── Removed:', line);
       }
       return isUnique;
