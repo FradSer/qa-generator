@@ -1,4 +1,6 @@
-# QA Generator
+# QA Generator ![](https://img.shields.io/badge/A%20FRAD%20PRODUCT-WIP-yellow)
+
+[![Twitter Follow](https://img.shields.io/twitter/follow/FradSer?style=social)](https://twitter.com/FradSer)
 
 English | [简体中文](README.zh-CN.md)
 
