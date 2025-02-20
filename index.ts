@@ -363,12 +363,13 @@ async function main_answers_parallel(
  */
 async function main() {
   const provider = process.env.AI_PROVIDER?.toLowerCase() || 'qianfan';
-  const mode = process.argv[2];
-  const regionPinyin = process.argv[3];
   
   // Parse command line arguments
-  const args = process.argv.slice(4);
+  const args = process.argv.slice(2);
   let options = {
+    mode: '',
+    region: '',
+    count: 100,
     workerCount: Math.max(1, navigator.hardwareConcurrency - 1),
     maxAttempts: 3,
     batchSize: 50,
@@ -379,31 +380,81 @@ async function main() {
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i].replace('--', '');
     const value = args[i + 1];
-    if (value) {
-      switch (key) {
-        case 'workers':
-          options.workerCount = parseInt(value);
-          break;
-        case 'attempts':
-          options.maxAttempts = parseInt(value);
-          break;
-        case 'batch':
-          options.batchSize = parseInt(value);
-          break;
-        case 'delay':
-          options.delay = parseInt(value);
-          break;
-      }
+    
+    if (!value) {
+      console.error(`Error: Missing value for argument ${key}`);
+      process.exit(1);
+    }
+
+    switch (key) {
+      case 'mode':
+        if (!['questions', 'answers', 'all'].includes(value)) {
+          console.error('Error: Invalid mode. Must be one of: questions, answers, all');
+          process.exit(1);
+        }
+        options.mode = value;
+        break;
+      case 'region':
+        options.region = value;
+        break;
+      case 'count':
+        const count = parseInt(value);
+        if (isNaN(count) || count <= 0) {
+          console.error('Error: count must be a positive number');
+          process.exit(1);
+        }
+        options.count = count;
+        break;
+      case 'workers':
+        const workers = parseInt(value);
+        if (isNaN(workers) || workers <= 0) {
+          console.error('Error: workers must be a positive number');
+          process.exit(1);
+        }
+        options.workerCount = workers;
+        break;
+      case 'attempts':
+        const attempts = parseInt(value);
+        if (isNaN(attempts) || attempts <= 0) {
+          console.error('Error: attempts must be a positive number');
+          process.exit(1);
+        }
+        options.maxAttempts = attempts;
+        break;
+      case 'batch':
+        const batch = parseInt(value);
+        if (isNaN(batch) || batch <= 0) {
+          console.error('Error: batch must be a positive number');
+          process.exit(1);
+        }
+        options.batchSize = batch;
+        break;
+      case 'delay':
+        const delay = parseInt(value);
+        if (isNaN(delay) || delay < 0) {
+          console.error('Error: delay must be a non-negative number');
+          process.exit(1);
+        }
+        options.delay = delay;
+        break;
+      default:
+        console.error(`Error: Unknown argument ${key}`);
+        process.exit(1);
     }
   }
-  
-  if (!mode || !['questions', 'answers', 'all'].includes(mode) || !regionPinyin) {
-    console.error('Error: Please specify a valid mode and region');
+
+  // Validate required arguments
+  if (!options.mode || !options.region) {
+    console.error('Error: Missing required arguments');
     console.error('Usage:');
-    console.error('  For generating questions: bun run start -- questions <region_pinyin> [options]');
-    console.error('  For generating answers: bun run start -- answers <region_pinyin> [options]');
+    console.error('  bun run start --mode <type> --region <name> [options]');
     console.error('');
-    console.error('Options:');
+    console.error('Required:');
+    console.error('  --mode <type>    Operation mode (questions|answers|all)');
+    console.error('  --region <name>  Region name in pinyin');
+    console.error('');
+    console.error('Optional:');
+    console.error('  --count <number>    Number of questions to generate (default: 100)');
     console.error('  --workers <number>  Number of worker threads (default: CPU cores - 1)');
     console.error('  --attempts <number> Maximum retry attempts (default: 3)');
     console.error('  --batch <number>    Batch size for processing (default: 50)');
@@ -411,9 +462,9 @@ async function main() {
     process.exit(1);
   }
 
-  const region = getRegionByPinyin(regionPinyin);
+  const region = getRegionByPinyin(options.region);
   if (!region) {
-    console.error(`Error: Region "${regionPinyin}" not found`);
+    console.error(`Error: Region "${options.region}" not found`);
     process.exit(1);
   }
 
@@ -446,10 +497,10 @@ async function main() {
   try {
     let questions: Question[] = [];
     
-    if (mode === 'questions' || mode === 'all') {
-      questions = await main_questions_parallel(100, region, options.workerCount);
+    if (options.mode === 'questions' || options.mode === 'all') {
+      questions = await main_questions_parallel(options.count, region, options.workerCount);
       console.log(`Generated ${questions.length} questions`);
-    } else if (mode === 'answers') {
+    } else if (options.mode === 'answers') {
       // Load existing questions from file
       const { questionFile } = getRegionFileNames(region.pinyin);
       try {
@@ -461,7 +512,7 @@ async function main() {
       }
     }
     
-    if (mode === 'answers' || mode === 'all') {
+    if (options.mode === 'answers' || options.mode === 'all') {
       const answers = await main_answers_parallel(
         questions,
         options.workerCount,
@@ -470,7 +521,7 @@ async function main() {
           batchDelay: options.delay,
           batchSize: options.batchSize
         },
-        regionPinyin
+        options.region
       );
       console.log(`Generated ${answers.length} answers`);
     }

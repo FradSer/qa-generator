@@ -4,29 +4,30 @@
 
 [English](README.md) | 简体中文
 
-一个强大的 TypeScript 应用程序，利用多个 AI 提供商为各种主题生成高质量的问答内容。
+一款基于多种 AI 模型的智能问答生成工具，专注于为中国各地区生成高质量的本地特色问答内容。
 
-## 核心功能
+## 主要特性
 
-- **多 AI 提供商支持**：无缝集成千帆和 Groq
-- **基于地区生成**：支持多个地区，可自定义名称和描述
-- **丰富的内容**：生成关于当地历史、文化、美食、景点和特产的独特问题
-- **质量保证**：
-  - 自动检测重复问题
-  - 答案生成多次重试机制
-  - 答案生成后自动保存进度
-- **灵活配置**：可自定义问题数量和答案重试次数
+- **多模型支持**：目前已集成百度千帆和 Groq 两大 AI 模型
+- **地区特色**：支持为不同地区定制化生成问答内容，可自定义地区名称和描述
+- **内容丰富**：涵盖地方历史、文化、美食、景点和特产等多个维度
+- **质量保障**：
+  - 智能去重，避免重复问题
+  - 答案生成失败自动重试
+  - 实时保存生成进度
+- **灵活配置**：可自定义问题数量和重试次数
+- **多线程处理**：利用多线程并行处理，提升生成效率
 
-## 环境要求
+## 运行环境
 
-开始之前，请确保您已准备：
-- [Bun](https://bun.sh) 运行时环境
-- 千帆 API 凭证（使用千帆提供商时需要）
-- Groq API 密钥（使用 Groq 提供商时需要）
+使用前请确保：
+- 已安装 [Bun](https://bun.sh) 运行环境
+- 有百度千帆 API 密钥（使用千帆模型时需要）
+- 有 Groq API 密钥（使用 Groq 模型时需要）
 
-## 快速开始
+## 快速上手
 
-1. 克隆仓库：
+1. 克隆项目：
 ```bash
 git clone https://github.com/FradSer/qa-generator.git
 cd qa-generator
@@ -37,12 +38,12 @@ cd qa-generator
 bun install
 ```
 
-3. 设置环境变量：
+3. 配置环境变量：
 ```bash
 cp .env.example .env
 ```
 
-4. 在 `.env` 中配置 API 密钥：
+4. 在 `.env` 中填写 API 密钥：
 ```bash
 # Required for QianFan provider (default)
 QIANFAN_ACCESS_KEY=your_qianfan_access_key
@@ -52,48 +53,55 @@ QIANFAN_SECRET_KEY=your_qianfan_secret_key
 GROQ_API_KEY=your_groq_api_key
 ```
 
-## 使用指南
+## 使用说明
 
-### 命令结构
+### 命令格式
 
 ```bash
-bun run start -- <模式> <地区> [选项]
+bun run start [参数]
 ```
 
 ### 参数说明
 
-- `模式`：运行模式
+必需参数：
+- `--mode <类型>`：运行模式
   - `questions`：仅生成问题
   - `answers`：仅生成答案
   - `all`：同时生成问题和答案
-- `地区`：地区拼音（如 "chibi" 代表赤壁）
-- `选项`：
-  - 问题模式：问题数量 [questionCount]（默认：10）
-  - 答案模式：最大重试次数 [maxAttempts]（默认：3）
+- `--region <名称>`：地区拼音（如 "chibi" 代表赤壁）
 
-### 示例命令
+可选参数：
+- `--count <数字>`：生成问题数量（默认：100）
+- `--workers <数字>`：工作线程数（默认：CPU核心数-1）
+- `--attempts <数字>`：最大重试次数（默认：3）
+- `--batch <数字>`：批处理大小（默认：50）
+- `--delay <数字>`：批次间延迟（毫秒）（默认：1000）
 
-1. 使用默认提供商（千帆）生成问题：
+### 使用示例
+
+1. 为特定地区生成问题：
 ```bash
-# 为赤壁生成 20 个问题
-bun run start -- questions chibi 20
+bun run start --mode questions --region chibi --count 50
 ```
 
-2. 使用 Groq 生成答案：
+2. 为已有问题生成答案：
 ```bash
-# 为赤壁的未回答问题生成答案
-AI_PROVIDER=groq bun run start -- answers chibi
+bun run start --mode answers --region chibi
 ```
 
 3. 同时生成问题和答案：
 ```bash
-# 使用 Groq 为赤壁生成 15 个问题及其答案
-AI_PROVIDER=groq bun run start -- all chibi 15
+bun run start --mode all --region chibi --count 100
+```
+
+4. 使用 Groq 模型：
+```bash
+AI_PROVIDER=groq bun run start --mode all --region chibi
 ```
 
 ### 添加新地区
 
-编辑 `config/config.ts` 文件添加新地区：
+在 `config/config.ts` 中添加新地区配置：
 
 ```typescript
 export const regions: Region[] = [
@@ -131,7 +139,7 @@ export const regions: Region[] = [
   {
     "question": "问题内容",
     "content": "答案内容",
-    "reasoning_content": "思考过程"
+    "reasoning_content": "推理过程"
   }
 ]
 ```
@@ -140,22 +148,25 @@ export const regions: Region[] = [
 
 ```
 .
-├── config/             # 配置文件
-├── providers/          # AI 提供商实现
-│   ├── groq/          # Groq 提供商
-│   └── qianfan/       # 千帆提供商
+├── config/            # 配置文件
+├── generators/        # 问答生成器
+├── providers/         # AI 模型接入
+│   ├── groq/          # Groq 模型
+│   └── qianfan/       # 千帆模型
+├── prompts/           # AI 提示词模板
 ├── types/             # TypeScript 类型定义
 ├── utils/             # 工具函数
-└── index.ts           # 主入口文件
+├── workers/           # 多线程处理
+└── index.ts           # 主程序入口
 ```
 
 ## 错误处理
 
-- 失败请求自动重试
-- 答案生成成功后自动保存进度
-- 自动检测并标记重复问题
-- 详细的错误日志记录
+- API 调用失败自动重试
+- 答案生成后自动保存进度
+- 智能检测并过滤重复问题
+- 详细的错误日志和堆栈追踪
 
-## 贡献
+## 参与贡献
 
-欢迎提交问题和改进建议！ 
+欢迎提交 Issue 和 Pull Request 来帮助改进项目！ 

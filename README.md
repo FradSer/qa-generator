@@ -4,7 +4,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A sophisticated TypeScript application that leverages multiple AI providers to generate high-quality questions and answers for various topics.
+A sophisticated TypeScript application that leverages multiple AI providers to generate high-quality questions and answers for various regions in China.
 
 ## Key Features
 
@@ -16,6 +16,7 @@ A sophisticated TypeScript application that leverages multiple AI providers to g
   - Multiple retry attempts for answer generation
   - Progress auto-save after each answer
 - **Flexible Configuration**: Customizable question count and answer retry attempts
+- **Multi-threaded Processing**: Parallel processing with worker threads for improved performance
 
 ## Prerequisites
 
@@ -57,38 +58,45 @@ GROQ_API_KEY=your_groq_api_key
 ### Command Structure
 
 ```bash
-bun run start -- <mode> <region> [options]
+bun run start [options]
 ```
 
 ### Parameters
 
-- `mode`: Operation mode
+Required options:
+- `--mode <type>`: Operation mode
   - `questions`: Generate questions only
   - `answers`: Generate answers only
   - `all`: Generate both questions and answers
-- `region`: Region name in pinyin (e.g., "chibi" for 赤壁)
-- `options`: 
-  - Questions mode: [questionCount] (default: 10)
-  - Answers mode: [maxAttempts] (default: 3)
+- `--region <name>`: Region name in pinyin (e.g., "chibi" for 赤壁)
+
+Optional parameters:
+- `--count <number>`: Number of questions to generate (default: 100)
+- `--workers <number>`: Number of worker threads (default: CPU cores - 1)
+- `--attempts <number>`: Maximum retry attempts (default: 3)
+- `--batch <number>`: Batch size for processing (default: 50)
+- `--delay <number>`: Delay between batches in milliseconds (default: 1000)
 
 ### Example Commands
 
-1. Generate questions using default provider (QianFan):
+1. Generate questions for a specific region:
 ```bash
-# Generate 20 questions for Chibi
-bun run start -- questions chibi 20
+bun run start --mode questions --region chibi --count 50
 ```
 
-2. Generate answers using Groq:
+2. Generate answers for existing questions:
 ```bash
-# Generate answers for unanswered Chibi questions
-AI_PROVIDER=groq bun run start -- answers chibi
+bun run start --mode answers --region chibi
 ```
 
 3. Generate both questions and answers:
 ```bash
-# Generate 15 questions and answers for Chibi using Groq
-AI_PROVIDER=groq bun run start -- all chibi 15
+bun run start --mode all --region chibi --count 100
+```
+
+4. Use Groq as AI provider:
+```bash
+AI_PROVIDER=groq bun run start --mode all --region chibi
 ```
 
 ### Adding New Regions
@@ -140,22 +148,25 @@ Each region generates two JSON files:
 
 ```
 .
-├── config/             # Configuration files
-├── providers/          # AI provider implementations
+├── config/            # Configuration files
+├── generators/        # Question and answer generators
+├── providers/         # AI provider implementations
 │   ├── groq/          # Groq provider
 │   └── qianfan/       # QianFan provider
+├── prompts/           # AI prompt templates
 ├── types/             # TypeScript type definitions
 ├── utils/             # Utility functions
+├── workers/           # Worker thread implementations
 └── index.ts           # Main entry point
 ```
 
 ## Error Handling
 
-- Automatic retry for failed requests
+- Automatic retry for failed API requests
 - Progress saving after each successful answer
-- Duplicate question detection and marking
-- Detailed error logging
+- Duplicate question detection and filtering
+- Detailed error logging with stack traces
 
 ## Contributing
 
-Issues and suggestions for improvements are welcome!
+Issues and pull requests are welcome! Feel free to contribute to improve the project.
