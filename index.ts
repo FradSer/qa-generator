@@ -254,7 +254,7 @@ async function main_answers(
 async function main_questions_parallel(
   questionCount: number,
   region: Region,
-  workerCount: number = Math.max(1, navigator.hardwareConcurrency - 1)
+  workerCount: number
 ) {
   console.log(`Generating questions for ${region.name} using ${workerCount} workers...`);
   
@@ -326,7 +326,7 @@ async function main_questions_parallel(
  */
 async function main_answers_parallel(
   questions: Question[],
-  workerCount: number = Math.max(1, navigator.hardwareConcurrency - 1),
+  workerCount: number,
   options: { maxAttempts: number; batchDelay: number; batchSize: number },
   regionPinyin: string
 ) {
@@ -484,7 +484,7 @@ async function main() {
     mode: '',
     region: '',
     count: 100,
-    workerCount: Math.max(1, navigator.hardwareConcurrency - 1),
+    workerCount: 10,
     maxAttempts: 3,
     batchSize: 50,
     delay: 1000, // delay between batches in ms
@@ -569,7 +569,7 @@ async function main() {
     console.error('');
     console.error('Optional:');
     console.error('  --count <number>    Number of questions to generate (default: 100)');
-    console.error('  --workers <number>  Number of worker threads (default: CPU cores - 1)');
+    console.error('  --workers <number>  Number of worker threads (default: 10)');
     console.error('  --attempts <number> Maximum retry attempts (default: 3)');
     console.error('  --batch <number>    Batch size for processing (default: 50)');
     console.error('  --delay <number>    Delay between batches in ms (default: 1000)');
