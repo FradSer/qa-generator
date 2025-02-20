@@ -1,10 +1,10 @@
 {
   "name": "qa-generator",
-  "main": "generate-groq.ts",
+  "main": "generators/generate-groq.ts",
   "type": "module",
   "scripts": {
-    "start:groq": "bun run generate-groq.ts",
-    "start:qianfan": "bun run generate-qianfan.ts"
+    "start:groq": "bun run generators/generate-groq.ts",
+    "start:qianfan": "bun run generators/generate-qianfan.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

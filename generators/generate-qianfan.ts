@@ -1,12 +1,12 @@
 import { ChatCompletion, setEnvVariable } from '@baiducloud/qianfan';
 import { config } from 'dotenv';
-import type { Region } from './config';
-import { getRegionByPinyin } from './config';
+import type { Region } from '../config/config';
+import { getRegionByPinyin } from '../config/config';
+import type { QAItem, Question } from '../types/types';
+import { isTooSimilar } from '../utils/similarity';
+import { StorageManager } from '../utils/storage';
+import { extractContent, extractThinkingContent, processStreamData } from '../utils/stream';
 import { generateQuestionPrompt, processQuestionResponse } from './prompt';
-import { isTooSimilar } from './similarity';
-import { StorageManager } from './storage';
-import { extractContent, extractThinkingContent, processStreamData } from './stream';
-import type { QAItem, Question } from './types';
 
 // Load environment variables from .env file
 config();

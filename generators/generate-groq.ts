@@ -1,8 +1,8 @@
 import { config } from 'dotenv';
 import { Groq } from 'groq-sdk';
 import { readFileSync, writeFileSync } from 'node:fs';
-import type { Region } from './config';
-import { getRegionByPinyin, getRegionFileNames } from './config';
+import type { Region } from '../config/config';
+import { getRegionByPinyin, getRegionFileNames } from '../config/config';
 
 // Load environment variables from .env file
 config();

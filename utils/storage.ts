@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import type { Region } from './config';
-import { getRegionFileNames } from './config';
-import type { QAItem, Question } from './types';
+import type { Region } from '../config/config';
+import { getRegionFileNames } from '../config/config';
+import type { QAItem, Question } from '../types/types';
 
 /**
  * Manages persistent storage operations for questions and answers
