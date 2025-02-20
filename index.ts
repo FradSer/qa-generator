@@ -374,23 +374,44 @@ async function main_answers_parallel(
     return existingAnswers;
   }
 
-  // Distribute work among workers
-  const tasks: Promise<QAItem>[] = [];
-  const batchSize = Math.min(options.batchSize, Math.ceil(unansweredQuestions.length / workerCount));
+  // 计算批次
+  const tenPercentWorkers = Math.floor(workerCount * 0.1);
+  let totalBatches = Math.ceil(unansweredQuestions.length / workerCount);
+  const lastBatchSize = unansweredQuestions.length % workerCount;
+  
+  // 如果最后一批的大小小于等于10%的worker数，减少一个批次
+  if (lastBatchSize > 0 && lastBatchSize <= tenPercentWorkers) {
+    totalBatches--;
+    console.log(`Last batch size (${lastBatchSize}) is <= 10% of workers, merging with previous batch`);
+  }
+  
+  console.log(`Will process in ${totalBatches} batches using ${workerCount} workers`);
 
-  for (let i = 0; i < unansweredQuestions.length; i += batchSize) {
-    const batchQuestions = unansweredQuestions.slice(i, Math.min(i + batchSize, unansweredQuestions.length));
-    console.log(`\nProcessing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(unansweredQuestions.length / batchSize)}`);
-    console.log(`Batch size: ${batchQuestions.length} questions`);
+  // 按批次处理
+  for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+    const isLastBatch = batchIndex === totalBatches - 1;
+    const start = batchIndex * workerCount;
+    let end;
     
-    for (const [idx, question] of batchQuestions.entries()) {
-      // Skip if already answered
-      if (answeredQuestions.has(question.question)) {
-        console.log(`Skipping already answered question: ${question.question.slice(0, 50)}...`);
-        continue;
-      }
+    if (isLastBatch && lastBatchSize <= tenPercentWorkers) {
+      // 如果是最后一批且剩余数量小于等于10%，处理所有剩余问题
+      end = unansweredQuestions.length;
+    } else {
+      end = Math.min(start + workerCount, unansweredQuestions.length);
+    }
+    
+    const batchQuestions = unansweredQuestions.slice(start, end);
+    
+    console.log(`\nProcessing batch ${batchIndex + 1}/${totalBatches}`);
+    console.log(`Batch size: ${batchQuestions.length} questions`);
 
-      const workerId = (idx % workerCount) + 1;
+    const tasks: Promise<QAItem>[] = [];
+
+    // 分配任务给workers
+    for (let i = 0; i < batchQuestions.length; i++) {
+      const workerId = i + 1;
+      const question = batchQuestions[i];
+      
       console.log(`Assigning question to worker ${workerId}: ${question.question.slice(0, 50)}...`);
       
       const task: AnswerWorkerTask = {
@@ -402,7 +423,7 @@ async function main_answers_parallel(
     }
 
     try {
-      console.log(`Waiting for batch ${Math.floor(i / batchSize) + 1} results...`);
+      console.log(`Waiting for batch ${batchIndex + 1} results...`);
       const batchResults = await Promise.all(tasks.splice(0, tasks.length));
       console.log(`Received ${batchResults.length} results from workers`);
       
@@ -443,7 +464,7 @@ async function main_answers_parallel(
       }
 
       // Add delay between batches if not the last batch
-      if (i + batchSize < unansweredQuestions.length) {
+      if (batchIndex < totalBatches - 1) {
         console.log(`Waiting ${options.batchDelay}ms before next batch...`);
         await new Promise(resolve => setTimeout(resolve, options.batchDelay));
       }
