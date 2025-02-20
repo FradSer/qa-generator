@@ -4,124 +4,136 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A TypeScript application that generates questions and answers for various topics using multiple AI providers.
+A sophisticated TypeScript application that leverages multiple AI providers to generate high-quality questions and answers for various topics.
 
-## Features
+## Key Features
 
-- Multiple AI provider support (QianFan, Groq)
-- Supports multiple regions with configurable names and descriptions
-- Generates unique questions about local history, culture, food, attractions, and specialties
-- Detects and marks duplicate questions
-- Supports multiple attempts for answer generation
-- Saves progress after each answer
-- Configurable number of questions and answer attempts
+- **Multiple AI Providers**: Seamless integration with QianFan and Groq
+- **Region-based Generation**: Support for multiple regions with customizable names and descriptions
+- **Diverse Content**: Generates unique questions about local history, culture, cuisine, attractions, and specialties
+- **Quality Assurance**: 
+  - Automatic duplicate question detection
+  - Multiple retry attempts for answer generation
+  - Progress auto-save after each answer
+- **Flexible Configuration**: Customizable question count and answer retry attempts
 
 ## Prerequisites
 
-- Node.js (v14 or later)
-- Bun runtime
+Before you begin, ensure you have:
+- [Bun](https://bun.sh) runtime installed
 - QianFan API credentials (for QianFan provider)
 - Groq API key (for Groq provider)
 
-## Setup
+## Getting Started
 
-1. Clone the repository
+1. Clone the repository:
+```bash
+git clone https://github.com/FradSer/qa-generator.git
+cd qa-generator
+```
+
 2. Install dependencies:
 ```bash
 bun install
 ```
-3. Create a `.env` file based on `.env.example`:
+
+3. Set up environment variables:
 ```bash
 cp .env.example .env
 ```
-4. Configure your environment variables in `.env`:
-```
-QIANFAN_ACCESS_KEY=your_qianfan_access_key    # Required for QianFan provider
-QIANFAN_SECRET_KEY=your_qianfan_secret_key    # Required for QianFan provider
-GROQ_API_KEY=your_groq_api_key                # Required for Groq provider
-```
 
-## Usage
-
-### Using QianFan Provider (Default)
-
-1. Generate questions only:
+4. Configure your API keys in `.env`:
 ```bash
-bun run start -- questions <region_pinyin> [questionCount]
+# Required for QianFan provider (default)
+QIANFAN_ACCESS_KEY=your_qianfan_access_key
+QIANFAN_SECRET_KEY=your_qianfan_secret_key
+
+# Required for Groq provider
+GROQ_API_KEY=your_groq_api_key
 ```
 
-2. Generate answers only (using existing questions):
-```bash
-bun run start -- answers <region_pinyin> [maxAttempts]
-```
+## Usage Guide
 
-3. Generate both questions and answers:
-```bash
-bun run start -- all <region_pinyin> [questionCount]
-```
-
-### Using Groq Provider
+### Command Structure
 
 ```bash
-bun run start:groq -- <mode> <region_pinyin> [options]
+bun run start -- <mode> <region> [options]
 ```
 
 ### Parameters
 
-- `region_pinyin`: Pinyin name of the region (e.g., "chibi" for 赤壁)
-- `questionCount`: Number of unique questions to generate (default: 10)
-- `maxAttempts`: Maximum number of attempts for each answer (default: 3)
-- `mode`: One of:
-  - `questions`: Generate only questions
-  - `answers`: Generate only answers
+- `mode`: Operation mode
+  - `questions`: Generate questions only
+  - `answers`: Generate answers only
   - `all`: Generate both questions and answers
+- `region`: Region name in pinyin (e.g., "chibi" for 赤壁)
+- `options`: 
+  - Questions mode: [questionCount] (default: 10)
+  - Answers mode: [maxAttempts] (default: 3)
+
+### Example Commands
+
+1. Generate questions using default provider (QianFan):
+```bash
+# Generate 20 questions for Chibi
+bun run start -- questions chibi 20
+```
+
+2. Generate answers using Groq:
+```bash
+# Generate answers for unanswered Chibi questions
+AI_PROVIDER=groq bun run start -- answers chibi
+```
+
+3. Generate both questions and answers:
+```bash
+# Generate 15 questions and answers for Chibi using Groq
+AI_PROVIDER=groq bun run start -- all chibi 15
+```
 
 ### Adding New Regions
 
-To add a new region, edit the `config.ts` file and add a new entry to the `regions` array:
+Edit `config/config.ts` to add new regions:
 
 ```typescript
 export const regions: Region[] = [
   {
     name: "赤壁",
     pinyin: "chibi",
-    description: "湖北省咸宁市赤壁市，三国赤壁之战古战场所在地"
+    description: "Chibi City in Xianning, Hubei Province, site of the historic Battle of Red Cliffs"
   },
-  // Add your new region here
+  // Add new regions here
   {
-    name: "新地区",
-    pinyin: "xindiqiu",
-    description: "新地区的描述"
+    name: "New Region",
+    pinyin: "newregion",
+    description: "Description of the new region"
   }
 ];
 ```
 
 ### Output Files
 
-For each region, two files will be generated:
+Each region generates two JSON files:
 
-- `<region_pinyin>_q_results.json`: Contains generated questions with duplicate detection
-- `<region_pinyin>_qa_results.json`: Contains questions and their answers
-
-### Question Format
-
-Each question in the questions file has the following structure:
+1. Questions file: `<region>_q_results.json`
 ```json
-{
-  "question": "地区本地...",
-  "is_answered": false
-}
+[
+  {
+    "question": "Question text",
+    "is_answered": false
+  }
+]
 ```
 
-### Answer Format
-
-Each QA pair in the answers file has the following structure:
+2. Q&A file: `<region>_qa_results.json`
 ```json
-{
-  "question": "地区本地...",
-  "content": "答案内容...",
-  "reasoning_content": "思考过程..."
-}
+[
+  {
+    "question": "Question text",
+    "content": "Answer content",
+    "reasoning_content": "Reasoning process"
+  }
+]
 ```
 
 ## Project Structure
@@ -129,27 +141,21 @@ Each QA pair in the answers file has the following structure:
 ```
 .
 ├── config/             # Configuration files
-├── generators/         # Legacy generator files
-│   └── generate-groq.ts  # Groq generator
 ├── providers/          # AI provider implementations
+│   ├── groq/          # Groq provider
 │   └── qianfan/       # QianFan provider
-│       ├── client.ts  # QianFan client
-│       └── service.ts # QianFan service
 ├── types/             # TypeScript type definitions
 ├── utils/             # Utility functions
-│   ├── prompt.ts      # Prompt utilities
-│   ├── similarity.ts  # Similarity checking
-│   └── stream.ts      # Stream processing
 └── index.ts           # Main entry point
 ```
 
 ## Error Handling
 
-- The script automatically retries failed answer attempts
-- Progress is saved after each successful answer
-- Duplicate questions are detected and marked
-- Failed attempts are logged with error messages
+- Automatic retry for failed requests
+- Progress saving after each successful answer
+- Duplicate question detection and marking
+- Detailed error logging
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests!
+Issues and suggestions for improvements are welcome!

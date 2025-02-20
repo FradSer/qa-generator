@@ -1,13 +1,13 @@
-import type { AIProviderService } from '../../types/provider';
+import type { AIProviderService, StreamResponse } from '../../types/provider';
 import type { QAItem } from '../../types/types';
 import { generateQuestionPrompt, processQuestionResponse } from '../../utils/prompt';
-import { extractContent, extractThinkingContent, processStreamData } from '../../utils/stream';
-import { qianfanClient } from './client';
+import { extractContent, extractThinkingContent } from '../../utils/stream';
+import { groqClient } from './client';
 
 /**
- * QianFan service implementation
+ * Groq service implementation
  */
-export class QianFanService implements AIProviderService {
+export class GroqService implements AIProviderService {
   /**
    * Generates answer for a given question with retry mechanism
    * @param question - Question to generate answer for
@@ -22,10 +22,10 @@ export class QianFanService implements AIProviderService {
         console.log(`\n[API Call] Answer attempt ${attempt}/${maxAttempts}`);
         console.time('[API] Response time');
         
-        const response = await qianfanClient.chat({
+        const response = await groqClient.chat({
           messages: [{ role: "user", content: question }],
           stream: true,
-        }, "deepseek-r1");
+        });
 
         console.timeEnd('[API] Response time');
         
@@ -33,9 +33,17 @@ export class QianFanService implements AIProviderService {
           throw new Error('Null response received from API');
         }
         
-        const { content: rawContent, reasoning_content: rawReasoningContent } = await processStreamData(response);
+        let rawContent = '';
+        let rawReasoningContent = '';
         
-        if (!rawContent && !rawReasoningContent) {
+        for await (const chunk of response) {
+          const streamChunk = chunk as StreamResponse;
+          const content = streamChunk.choices[0]?.delta?.content || '';
+          process.stdout.write(content);
+          rawContent += content;
+        }
+        
+        if (!rawContent) {
           throw new Error('Empty response received from API');
         }
         
@@ -69,7 +77,7 @@ export class QianFanService implements AIProviderService {
   }
 
   /**
-   * Generates questions using QianFan API
+   * Generates questions using Groq API
    * @param regionName - Name of the region
    * @param batchSize - Number of questions to generate
    * @param maxAttempts - Maximum number of retry attempts
@@ -82,16 +90,22 @@ export class QianFanService implements AIProviderService {
       try {
         console.log(`\nBatch attempt ${attempt}/${maxAttempts}...`);
         
-        const response = await qianfanClient.chat({
+        const response = await groqClient.chat({
           messages: [{ 
             role: "user", 
             content: prompt
           }],
           stream: true,
-        }, "deepseek-r1");
+        });
 
-        const result = await processStreamData(response);
-        return processQuestionResponse(result.content, regionName);
+        let rawContent = '';
+        for await (const chunk of response) {
+          const streamChunk = chunk as StreamResponse;
+          const content = streamChunk.choices[0]?.delta?.content || '';
+          rawContent += content;
+        }
+
+        return processQuestionResponse(rawContent, regionName);
       } catch (error) {
         console.error(`Error in batch attempt ${attempt}:`, error);
         if (attempt < maxAttempts) {
@@ -107,4 +121,4 @@ export class QianFanService implements AIProviderService {
   }
 }
 
-export const qianfanService = new QianFanService(); 
+export const groqService = new GroqService(); 

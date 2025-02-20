@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { Region } from './config/config';
 import { getRegionByPinyin, getRegionFileNames } from './config/config';
+import { setupGroqEnvironment } from './providers/groq/client';
+import { groqService } from './providers/groq/service';
 import { setupQianFanEnvironment } from './providers/qianfan/client';
-import { generateAnswer, generateQuestionsFromPrompt } from './providers/qianfan/service';
+import { qianfanService } from './providers/qianfan/service';
 import type { QAItem, Question } from './types/types';
 import { isTooSimilar } from './utils/similarity';
 
@@ -12,9 +14,15 @@ import { isTooSimilar } from './utils/similarity';
  * @param count - Number of questions to generate
  * @param region - Target region
  * @param maxAttempts - Maximum number of retry attempts
+ * @param generateQuestionsFromPrompt - Function to generate questions from prompt
  * @returns Promise<Question[]> Generated questions
  */
-async function generateQuestions(count: number, region: Region, maxAttempts: number = 3): Promise<Question[]> {
+async function generateQuestions(
+  count: number, 
+  region: Region, 
+  maxAttempts: number = 3,
+  generateQuestionsFromPrompt: (regionName: string, batchSize: number, maxAttempts: number) => Promise<string>
+): Promise<Question[]> {
   const { questionFile } = getRegionFileNames(region.pinyin);
   let questions: Question[] = [];
   const existingQuestions = new Set<string>();
@@ -136,8 +144,13 @@ async function generateQuestions(count: number, region: Region, maxAttempts: num
  * Generates answers for unanswered questions
  * @param region - Target region
  * @param maxAnswerAttempts - Maximum number of retry attempts
+ * @param generateAnswer - Function to generate answer
  */
-async function generateAnswers(region: Region, maxAnswerAttempts: number = 3): Promise<void> {
+async function generateAnswers(
+  region: Region, 
+  maxAnswerAttempts: number = 3,
+  generateAnswer: (question: string, maxAttempts: number) => Promise<QAItem>
+): Promise<void> {
   const { questionFile, qaFile } = getRegionFileNames(region.pinyin);
   let qaItems: QAItem[] = [];
   
@@ -196,9 +209,13 @@ async function generateAnswers(region: Region, maxAnswerAttempts: number = 3): P
 /**
  * Main entry point for question generation
  */
-async function main_questions(questionCount: number, region: Region) {
+async function main_questions(
+  questionCount: number, 
+  region: Region, 
+  generateQuestionsFromPrompt: (regionName: string, batchSize: number, maxAttempts: number) => Promise<string>
+) {
   console.log(`Generating questions for ${region.name}...`);
-  const questions = await generateQuestions(questionCount, region);
+  const questions = await generateQuestions(questionCount, region, 3, generateQuestionsFromPrompt);
   const uniqueQuestions = questions.filter(q => !q.is_answered).length;
   const answeredQuestions = questions.filter(q => q.is_answered).length;
   console.log(`\nFinal results:`);
@@ -210,17 +227,19 @@ async function main_questions(questionCount: number, region: Region) {
 /**
  * Main entry point for answer generation
  */
-async function main_answers(region: Region) {
+async function main_answers(
+  region: Region, 
+  generateAnswer: (question: string, maxAttempts: number) => Promise<QAItem>
+) {
   console.log(`Getting answers for ${region.name}...`);
-  await generateAnswers(region);
+  await generateAnswers(region, 3, generateAnswer);
 }
 
 /**
  * Main application entry point
  */
 async function main() {
-  setupQianFanEnvironment();
-  
+  const provider = process.env.AI_PROVIDER?.toLowerCase() || 'qianfan';
   const mode = process.argv[2];
   const regionPinyin = process.argv[3];
   
@@ -239,20 +258,41 @@ async function main() {
     process.exit(1);
   }
 
-  if (mode === 'all') {
-    const questionCount = parseInt(process.argv[4] || '10', 10);
-    await main_questions(questionCount, region);
-    await main_answers(region);
-    return;
+  // Setup provider environment
+  try {
+    switch (provider) {
+      case 'qianfan':
+        setupQianFanEnvironment();
+        break;
+      case 'groq':
+        setupGroqEnvironment();
+        break;
+      default:
+        throw new Error(`Unsupported AI provider: ${provider}`);
+    }
+  } catch (error) {
+    console.error(`Failed to setup ${provider} environment:`, error);
+    process.exit(1);
   }
 
-  if (mode === 'questions') {
-    const questionCount = parseInt(process.argv[4] || '10', 10);
-    await main_questions(questionCount, region);
-  }
-  
-  if (mode === 'answers') {
-    await main_answers(region);
+  // Select provider functions
+  const { generateAnswer, generateQuestionsFromPrompt } = provider === 'groq' 
+    ? { generateAnswer: groqService.generateAnswer.bind(groqService), generateQuestionsFromPrompt: groqService.generateQuestionsFromPrompt.bind(groqService) }
+    : { generateAnswer: qianfanService.generateAnswer.bind(qianfanService), generateQuestionsFromPrompt: qianfanService.generateQuestionsFromPrompt.bind(qianfanService) };
+
+  // Execute requested mode
+  try {
+    if (mode === 'all' || mode === 'questions') {
+      const questionCount = parseInt(process.argv[4] || '10', 10);
+      await main_questions(questionCount, region, generateQuestionsFromPrompt);
+    }
+    
+    if (mode === 'all' || mode === 'answers') {
+      await main_answers(region, generateAnswer);
+    }
+  } catch (error) {
+    console.error('Error executing requested mode:', error);
+    process.exit(1);
   }
 }
 
