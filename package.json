@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@baiducloud/qianfan": "^0.2.2",
+    "@node-rs/jieba": "^2.0.1",
     "@types/node": "^20.11.19",
     "dotenv": "^16.4.4",
     "groq-sdk": "^0.15.0"
