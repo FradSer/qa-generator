@@ -192,7 +192,18 @@ async function generateAnswers(
           writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
         }
         
-        writeFileSync(qaFile, JSON.stringify(qaItems, null, 2), 'utf-8');
+        // Log the QA file path
+        console.log('Writing to QA file:', qaFile);
+
+        // Log the QA items to be written
+        console.log('QA Items to write:', qaItems);
+
+        try {
+          writeFileSync(qaFile, JSON.stringify(qaItems, null, 2), 'utf-8');
+          console.log('Successfully wrote to QA file.');
+        } catch (error) {
+          console.error('Error writing to QA file:', error);
+        }
         
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
@@ -322,71 +333,140 @@ async function main_answers_parallel(
   console.log(`Generating answers using ${workerCount} workers...`);
   console.log(`Options: maxAttempts=${options.maxAttempts}, batchSize=${options.batchSize}, delay=${options.batchDelay}ms`);
   
-  // Create worker status display
-  console.log('\nWorker Status:');
-  for (let i = 0; i < workerCount; i++) {
-    console.log(`Worker ${i + 1}: Initializing...`);
-  }
-  console.log('\n');  // Add extra line for separation
-  
   const answerPool = new WorkerPool(workerCount, './workers/answer-worker.ts');
-  const unansweredQuestions = questions.filter(q => !q.is_answered);
-  const answers: QAItem[] = [];
+  const { qaFile, questionFile } = getRegionFileNames(regionPinyin);
   
-  // Process questions in batches
-  for (let i = 0; i < unansweredQuestions.length; i += options.batchSize) {
-    const batchQuestions = unansweredQuestions.slice(i, i + options.batchSize);
-    console.log(`\nProcessing batch ${Math.floor(i / options.batchSize) + 1}/${Math.ceil(unansweredQuestions.length / options.batchSize)}`);
+  console.log('Initialized worker pool and got file paths:');
+  console.log('- QA File:', qaFile);
+  console.log('- Question File:', questionFile);
+  
+  // Load existing answers first
+  let existingAnswers: QAItem[] = [];
+  try {
+    existingAnswers = JSON.parse(readFileSync(qaFile, 'utf-8')) as QAItem[];
+    console.log(`Loaded ${existingAnswers.length} existing answers`);
+  } catch (error) {
+    console.log('No existing answers found, starting fresh');
+  }
 
-    const batchPromises: Promise<QAItem>[] = batchQuestions.map((q, idx) => {
+  // Create a set of answered questions for quick lookup
+  const answeredQuestions = new Set(existingAnswers.map(item => item.question));
+  
+  // Update questions status based on existing answers
+  questions.forEach(q => {
+    q.is_answered = answeredQuestions.has(q.question);
+  });
+  
+  console.log('Writing updated question status to file...');
+  try {
+    writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
+    console.log('Successfully updated question file');
+  } catch (error) {
+    console.error('Error updating question file:', error);
+  }
+
+  // Get unanswered questions
+  const unansweredQuestions = questions.filter(q => !q.is_answered);
+  console.log(`Found ${unansweredQuestions.length} questions without answers`);
+
+  if (unansweredQuestions.length === 0) {
+    console.log('No unanswered questions found, nothing to do');
+    return existingAnswers;
+  }
+
+  // Distribute work among workers
+  const tasks: Promise<QAItem>[] = [];
+  const batchSize = Math.min(options.batchSize, Math.ceil(unansweredQuestions.length / workerCount));
+
+  for (let i = 0; i < unansweredQuestions.length; i += batchSize) {
+    const batchQuestions = unansweredQuestions.slice(i, Math.min(i + batchSize, unansweredQuestions.length));
+    console.log(`\nProcessing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(unansweredQuestions.length / batchSize)}`);
+    console.log(`Batch size: ${batchQuestions.length} questions`);
+    
+    for (const [idx, question] of batchQuestions.entries()) {
+      // Skip if already answered
+      if (answeredQuestions.has(question.question)) {
+        console.log(`Skipping already answered question: ${question.question.slice(0, 50)}...`);
+        continue;
+      }
+
       const workerId = (idx % workerCount) + 1;
+      console.log(`Assigning question to worker ${workerId}: ${question.question.slice(0, 50)}...`);
+      
       const task: AnswerWorkerTask = {
-        question: q.question,
+        question: question.question,
         maxAttempts: options.maxAttempts,
         workerId
       };
-      return answerPool.execute<QAItem>(task);
-    });
+      tasks.push(answerPool.execute(task));
+    }
 
     try {
-      // Wait for current batch to complete
-      const batchAnswers = await Promise.all(batchPromises);
-      answers.push(...batchAnswers);
+      console.log(`Waiting for batch ${Math.floor(i / batchSize) + 1} results...`);
+      const batchResults = await Promise.all(tasks.splice(0, tasks.length));
+      console.log(`Received ${batchResults.length} results from workers`);
       
-      // Update progress
-      console.log(`Completed ${answers.length}/${unansweredQuestions.length} answers`);
+      // Process valid results
+      const validResults = batchResults.filter((result): result is QAItem => 
+        result !== null && !('error' in result)
+      );
       
-      // Save answers to file after each batch
-      const { qaFile } = getRegionFileNames(regionPinyin);
-      writeFileSync(qaFile, JSON.stringify(answers, null, 2), 'utf-8');
-      console.log(`Saved answers to ${qaFile}`);
+      console.log(`Valid results: ${validResults.length}/${batchResults.length}`);
       
+      if (validResults.length > 0) {
+        // Add new answers
+        for (const result of validResults) {
+          if (!answeredQuestions.has(result.question)) {
+            console.log(`Adding new answer for question: ${result.question.slice(0, 50)}...`);
+            existingAnswers.push(result);
+            answeredQuestions.add(result.question);
+            
+            // Update question status
+            const questionIndex = questions.findIndex(q => q.question === result.question);
+            if (questionIndex !== -1) {
+              questions[questionIndex].is_answered = true;
+            }
+          }
+        }
+        
+        // Save results after each successful batch
+        console.log('Writing results to files...');
+        try {
+          writeFileSync(qaFile, JSON.stringify(existingAnswers, null, 2), 'utf-8');
+          writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
+          console.log('Successfully saved batch results');
+        } catch (error) {
+          console.error('Error saving batch results:', error);
+        }
+        
+        console.log(`Progress: ${existingAnswers.length}/${questions.length} total answers`);
+      }
+
       // Add delay between batches if not the last batch
-      if (i + options.batchSize < unansweredQuestions.length) {
+      if (i + batchSize < unansweredQuestions.length) {
         console.log(`Waiting ${options.batchDelay}ms before next batch...`);
         await new Promise(resolve => setTimeout(resolve, options.batchDelay));
       }
     } catch (error) {
       console.error(`Error processing batch:`, error);
-      // Continue with next batch even if current batch fails
+      // Save current progress even if batch fails
+      try {
+        console.log('Saving current progress after error...');
+        writeFileSync(qaFile, JSON.stringify(existingAnswers, null, 2), 'utf-8');
+        writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
+        console.log('Successfully saved current progress');
+      } catch (saveError) {
+        console.error('Error saving current progress:', saveError);
+      }
     }
   }
 
   try {
     console.log(`\nGeneration complete!`);
-    console.log(`Generated ${answers.length} answers out of ${unansweredQuestions.length} questions`);
+    console.log(`Total answers in file: ${existingAnswers.length}`);
+    console.log(`Questions answered: ${questions.filter(q => q.is_answered).length}/${questions.length}`);
     
-    // Update question status
-    questions.forEach(q => {
-      q.is_answered = answers.some(a => a.question === q.question);
-    });
-    
-    // Save updated questions
-    const { questionFile } = getRegionFileNames(regionPinyin);
-    writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
-    console.log(`Updated question status in ${questionFile}`);
-    
-    return answers;
+    return existingAnswers;
   } finally {
     answerPool.terminate();
   }
