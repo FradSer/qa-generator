@@ -225,10 +225,11 @@ async function generateAnswers(
 async function main_questions(
   questionCount: number, 
   region: Region, 
+  maxAttempts: number = 3,
   generateQuestionsFromPrompt: (regionName: string, batchSize: number, maxAttempts: number) => Promise<string>
 ) {
   console.log(`Generating questions for ${region.name}...`);
-  const questions = await generateQuestions(questionCount, region, 3, generateQuestionsFromPrompt);
+  const questions = await generateQuestions(questionCount, region, maxAttempts, generateQuestionsFromPrompt);
   const uniqueQuestions = questions.filter(q => !q.is_answered).length;
   const answeredQuestions = questions.filter(q => q.is_answered).length;
   console.log(`\nFinal results:`);
@@ -242,78 +243,127 @@ async function main_questions(
  */
 async function main_answers(
   region: Region, 
+  maxAnswerAttempts: number = 3,
   generateAnswer: (question: string, maxAttempts: number) => Promise<QAItem>
 ) {
   console.log(`Getting answers for ${region.name}...`);
-  await generateAnswers(region, 3, generateAnswer);
+  await generateAnswers(region, maxAnswerAttempts, generateAnswer);
 }
 
 /**
  * Main entry point for parallel question generation
  */
 async function main_questions_parallel(
-  questionCount: number,
+  totalQuestionCount: number,  // Total questions needed
   region: Region,
-  workerCount: number
+  workerCount: number,
+  maxPerWorker: number = 50,  // Maximum questions per worker
+  maxRetries: number = 5      // Maximum number of retries for reaching target count
 ) {
-  console.log(`Generating questions for ${region.name} using ${workerCount} workers...`);
+  console.log(`Target to generate ${totalQuestionCount} questions using ${workerCount} workers (max ${maxPerWorker} per worker)...`);
   
   const questionPool = new WorkerPool(workerCount, './workers/question-worker.ts');
-  const batchSize = Math.ceil(questionCount / workerCount);
-  const tasks: Promise<Question[]>[] = [];
-
-  // Load existing questions first
-  const { questionFile } = getRegionFileNames(region.pinyin);
-  let existingQuestions: Question[] = [];
-  try {
-    existingQuestions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
-    console.log(`Loaded ${existingQuestions.length} existing questions`);
-  } catch (error) {
-    console.log('No existing questions found, starting fresh');
-  }
-
-  // Calculate remaining questions needed
-  const remainingCount = Math.max(0, questionCount - existingQuestions.length);
-  if (remainingCount === 0) {
-    console.log('Already have enough questions, no need to generate more');
-    return existingQuestions;
-  }
-
-  // Distribute work among workers
-  for (let i = 0; i < workerCount && remainingCount > 0; i++) {
-    const workerBatchSize = Math.min(batchSize, remainingCount - i * batchSize);
-    if (workerBatchSize <= 0) break;
-
-    const task: QuestionWorkerTask = {
-      regionName: region.name,
-      batchSize: workerBatchSize,
-      maxAttempts: 3,
-      workerId: i + 1
-    };
-    tasks.push(questionPool.execute(task));
-  }
+  let retryCount = 0;
+  let allQuestions: Question[] = [];
 
   try {
-    // Wait for all workers to complete
-    const results = await Promise.all(tasks);
-    
-    // Combine and deduplicate results
-    const newQuestions = results.flat();
-    const allQuestions = [...existingQuestions];
-    const existingSet = new Set(existingQuestions.map(q => q.question));
-    
-    // Add new unique questions
-    for (const q of newQuestions) {
-      if (!existingSet.has(q.question) && !isTooSimilar(q.question, Array.from(existingSet), region.name)) {
-        allQuestions.push({ ...q, is_answered: false });
-        existingSet.add(q.question);
+    // Load existing questions first
+    const { questionFile } = getRegionFileNames(region.pinyin);
+    try {
+      allQuestions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
+      console.log(`Loaded ${allQuestions.length} existing questions`);
+    } catch (error) {
+      console.log('No existing questions found, starting fresh');
+    }
+
+    // Keep generating until we reach the target or max retries
+    while (allQuestions.length < totalQuestionCount && retryCount < maxRetries) {
+      if (retryCount > 0) {
+        console.log(`\nRetry #${retryCount}: Current questions count (${allQuestions.length}) is below target (${totalQuestionCount})`);
+      }
+
+      // Calculate remaining questions needed
+      const remainingCount = totalQuestionCount - allQuestions.length;
+      
+      // Calculate optimal number of workers needed based on remaining count and max per worker
+      const optimalWorkerCount = Math.ceil(remainingCount / maxPerWorker);
+      const actualWorkerCount = Math.min(workerCount, optimalWorkerCount);
+      
+      // Calculate questions per worker for this batch
+      const basePerWorker = Math.min(maxPerWorker, Math.ceil(remainingCount / actualWorkerCount));
+      console.log(`\nBatch ${retryCount + 1}: Will use ${actualWorkerCount} workers to generate ${remainingCount} questions (approximately ${basePerWorker} per worker)`);
+      
+      // Distribute work among workers
+      let remainingToDistribute = remainingCount;
+      const tasks: Promise<Question[]>[] = [];
+      
+      for (let i = 0; i < actualWorkerCount && remainingToDistribute > 0; i++) {
+        const workerBatchSize = Math.min(basePerWorker, remainingToDistribute);
+        if (workerBatchSize <= 0) break;
+
+        const task: QuestionWorkerTask = {
+          regionName: region.name,
+          batchSize: workerBatchSize,
+          maxAttempts: 3,
+          workerId: i + 1
+        };
+        tasks.push(questionPool.execute(task));
+        remainingToDistribute -= workerBatchSize;
+      }
+
+      // Wait for all workers in this batch to complete
+      const results = await Promise.all(tasks);
+      
+      // Process new questions
+      const newQuestions = results.flat();
+      const existingSet = new Set(allQuestions.map(q => q.question));
+      let newAddedCount = 0;
+      
+      // Add new unique questions
+      for (const q of newQuestions) {
+        // Skip invalid questions
+        if (!q || typeof q.question !== 'string' || !q.question.trim()) {
+          console.log('Skipping invalid question:', q);
+          continue;
+        }
+
+        if (!existingSet.has(q.question) && !isTooSimilar(q.question, Array.from(existingSet), region.name)) {
+          allQuestions.push({ ...q, is_answered: false });
+          existingSet.add(q.question);
+          newAddedCount++;
+        }
+      }
+
+      // Save progress after each batch
+      writeFileSync(questionFile, JSON.stringify(allQuestions, null, 2), 'utf-8');
+      
+      console.log(`\nBatch ${retryCount + 1} Summary:`);
+      console.log(`- New unique questions added: ${newAddedCount}`);
+      console.log(`- Current total: ${allQuestions.length}/${totalQuestionCount}`);
+      console.log(`- Progress: ${((allQuestions.length / totalQuestionCount) * 100).toFixed(2)}%`);
+
+      // If no new questions were added in this batch, increment retry counter
+      if (newAddedCount === 0) {
+        retryCount++;
+        console.log(`\nNo new questions added in this batch. Retry ${retryCount}/${maxRetries}`);
+        
+        // Add a delay before next retry to avoid rate limiting
+        if (retryCount < maxRetries) {
+          const delayTime = 5000 * retryCount; // Increasing delay with each retry
+          console.log(`Waiting ${delayTime/1000} seconds before next attempt...`);
+          await new Promise(resolve => setTimeout(resolve, delayTime));
+        }
       }
     }
 
-    // Save combined results
-    writeFileSync(questionFile, JSON.stringify(allQuestions, null, 2), 'utf-8');
-    console.log(`Generated and saved ${allQuestions.length - existingQuestions.length} new questions`);
-    console.log(`Total questions in file: ${allQuestions.length}`);
+    // Final status
+    if (allQuestions.length >= totalQuestionCount) {
+      console.log(`\n✅ Successfully generated target number of questions: ${allQuestions.length}/${totalQuestionCount}`);
+    } else {
+      console.log(`\n⚠️ Could not reach target count after ${maxRetries} retries:`);
+      console.log(`- Final question count: ${allQuestions.length}/${totalQuestionCount}`);
+      console.log(`- Achievement rate: ${((allQuestions.length / totalQuestionCount) * 100).toFixed(2)}%`);
+    }
     
     return allQuestions;
   } finally {
@@ -504,11 +554,12 @@ async function main() {
   let options = {
     mode: '',
     region: '',
-    count: 100,
-    workerCount: 10,
+    totalCount: 1000,    // Changed from perWorkerCount to totalCount
+    workerCount: 5,
+    maxQPerWorker: 50,    // Renamed from maxPerWorker
     maxAttempts: 3,
     batchSize: 50,
-    delay: 1000, // delay between batches in ms
+    delay: 1000,
   };
 
   // Parse named arguments
@@ -538,7 +589,7 @@ async function main() {
           console.error('Error: count must be a positive number');
           process.exit(1);
         }
-        options.count = count;
+        options.totalCount = count;
         break;
       case 'workers':
         const workers = parseInt(value);
@@ -547,6 +598,14 @@ async function main() {
           process.exit(1);
         }
         options.workerCount = workers;
+        break;
+      case 'max-q-per-worker':  // Renamed from max-per-worker
+        const maxQPerWorker = parseInt(value);
+        if (isNaN(maxQPerWorker) || maxQPerWorker <= 0) {
+          console.error('Error: max-q-per-worker must be a positive number');
+          process.exit(1);
+        }
+        options.maxQPerWorker = maxQPerWorker;
         break;
       case 'attempts':
         const attempts = parseInt(value);
@@ -589,11 +648,12 @@ async function main() {
     console.error('  --region <name>  Region name in pinyin');
     console.error('');
     console.error('Optional:');
-    console.error('  --count <number>    Number of questions to generate (default: 100)');
-    console.error('  --workers <number>  Number of worker threads (default: 10)');
-    console.error('  --attempts <number> Maximum retry attempts (default: 3)');
-    console.error('  --batch <number>    Batch size for processing (default: 50)');
-    console.error('  --delay <number>    Delay between batches in ms (default: 1000)');
+    console.error('  --count <number>            Total questions to generate (default: 1000)');
+    console.error('  --workers <number>          Number of worker threads (default: 5)');
+    console.error('  --max-q-per-worker <number> Maximum questions per worker (default: 50)');
+    console.error('  --attempts <number>         Maximum retry attempts (default: 3)');
+    console.error('  --batch <number>            Batch size for processing (default: 50)');
+    console.error('  --delay <number>            Delay between batches in ms (default: 1000)');
     process.exit(1);
   }
 
@@ -631,35 +691,99 @@ async function main() {
   // Execute requested mode
   try {
     let questions: Question[] = [];
+    let answers: QAItem[] = [];
     
+    // Handle question generation
     if (options.mode === 'questions' || options.mode === 'all') {
-      questions = await main_questions_parallel(options.count, region, options.workerCount);
-      console.log(`Generated ${questions.length} questions`);
-    } else if (options.mode === 'answers') {
-      // Load existing questions from file
-      const { questionFile } = getRegionFileNames(region.pinyin);
+      console.log('\n=== Question Generation Phase ===');
+      questions = await main_questions_parallel(
+        options.totalCount,
+        region,
+        options.workerCount,
+        options.maxQPerWorker  // Updated parameter name
+      );
+      
+      const totalGenerated = questions.length;
+      const targetCount = options.totalCount;
+      console.log(`\nQuestion Generation Summary:`);
+      console.log(`- Target count: ${targetCount}`);
+      console.log(`- Total generated: ${totalGenerated}`);
+      console.log(`- Generation rate: ${((totalGenerated / targetCount) * 100).toFixed(2)}%`);
+    }
+    
+    // Handle answer generation
+    if (options.mode === 'answers' || options.mode === 'all') {
+      console.log('\n=== Answer Generation Phase ===');
+      
+      // If we're in 'answers' mode or if we need to load questions
+      if (options.mode === 'answers' || questions.length === 0) {
+        const { questionFile } = getRegionFileNames(region.pinyin);
+        try {
+          questions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
+          console.log(`Loaded ${questions.length} questions from file`);
+        } catch (error) {
+          console.error('Error loading questions file:', error);
+          process.exit(1);
+        }
+      }
+
+      // Calculate answer statistics before generation
+      const totalQuestions = questions.length;
+      const answeredBefore = questions.filter(q => q.is_answered).length;
+      const unansweredBefore = totalQuestions - answeredBefore;
+      
+      console.log(`\nPre-generation Status:`);
+      console.log(`- Total questions: ${totalQuestions}`);
+      console.log(`- Already answered: ${answeredBefore}`);
+      console.log(`- Pending answers: ${unansweredBefore}`);
+
+      if (unansweredBefore > 0) {
+        answers = await main_answers_parallel(
+          questions,
+          options.workerCount,
+          {
+            maxAttempts: options.maxAttempts,
+            batchDelay: options.delay,
+            batchSize: options.batchSize
+          },
+          options.region
+        );
+
+        // Calculate final statistics
+        const answeredAfter = answers.length;
+        const newlyAnswered = answeredAfter - answeredBefore;
+        
+        console.log(`\nAnswer Generation Summary:`);
+        console.log(`- Previously answered: ${answeredBefore}`);
+        console.log(`- Newly answered: ${newlyAnswered}`);
+        console.log(`- Total answered: ${answeredAfter}`);
+        console.log(`- Answer completion rate: ${((answeredAfter / totalQuestions) * 100).toFixed(2)}%`);
+      } else {
+        console.log('\nAll questions are already answered, no need for answer generation.');
+      }
+    }
+
+    // Final summary for 'all' mode
+    if (options.mode === 'all') {
+      const { questionFile, qaFile } = getRegionFileNames(region.pinyin);
+      console.log('\n=== Final Status ===');
       try {
-        questions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
-        console.log(`Loaded ${questions.length} questions from file`);
+        const finalQuestions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
+        const finalAnswers = JSON.parse(readFileSync(qaFile, 'utf-8')) as QAItem[];
+        
+        console.log(`Questions:`);
+        console.log(`- Total in file: ${finalQuestions.length}`);
+        console.log(`- Target count: ${options.totalCount}`);
+        console.log(`- Completion rate: ${((finalQuestions.length / options.totalCount) * 100).toFixed(2)}%`);
+        
+        console.log(`\nAnswers:`);
+        console.log(`- Total answers: ${finalAnswers.length}`);
+        console.log(`- Answer rate: ${((finalAnswers.length / finalQuestions.length) * 100).toFixed(2)}%`);
       } catch (error) {
-        console.error('Error loading questions file:', error);
-        process.exit(1);
+        console.error('Error reading final status:', error);
       }
     }
     
-    if (options.mode === 'answers' || options.mode === 'all') {
-      const answers = await main_answers_parallel(
-        questions,
-        options.workerCount,
-        {
-          maxAttempts: options.maxAttempts,
-          batchDelay: options.delay,
-          batchSize: options.batchSize
-        },
-        options.region
-      );
-      console.log(`Generated ${answers.length} answers`);
-    }
   } catch (error) {
     console.error('Error executing requested mode:', error);
     process.exit(1);
