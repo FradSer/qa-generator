@@ -1,8 +1,5 @@
 /**
- * Generates prompt for question generation
- * @param regionName - Name of the region
- * @param batchSize - Number of questions to generate
- * @returns Generated prompt
+ * Generates a question prompt for a specific region
  */
 export function generateQuestionPrompt(regionName: string, batchSize: number): string {
   return `作为一个本地文化专家，请生成${batchSize}个关于${regionName}的高质量问题。
@@ -34,10 +31,8 @@ ${regionName}本地的丝绸产业发展历史可以追溯到什么时候？
 
 /**
  * Processes raw API response into structured question format
- * @param text - Raw API response text
- * @returns JSON string of processed questions
  */
-export function processQuestionResponse(text: string): string {
+export function processQuestionResponse(text: string, regionName: string): string {
   console.log('\n🔍 Processing Response');
   console.log('├── Input Length:', text.length);
   console.log('└── Input Preview:', text.slice(0, 100).replace(/\n/g, '\\n') + (text.length > 100 ? '...' : ''));
@@ -51,7 +46,9 @@ export function processQuestionResponse(text: string): string {
   console.log('\n🔄 Question Processing');
   const questions = lines
     .filter(line => {
-      const isValid = line && line.includes('本地') && (line.includes('？') || line.includes('?'));
+      const isValid = line && 
+                     line.startsWith(`${regionName}本地`) && 
+                     (line.includes('？') || line.includes('?'));
       if (!isValid && line.length > 0) {
         console.log('├── Filtered:', '❌');
         console.log('│   └── Invalid:', line);

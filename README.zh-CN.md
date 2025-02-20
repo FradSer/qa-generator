@@ -4,10 +4,11 @@
 
 [English](README.md) | 简体中文
 
-一个使用 Groq API 和其他来源为各种主题生成问答的 TypeScript 应用。
+一个使用多个 AI 提供商为各种主题生成问答的 TypeScript 应用。
 
 ## 功能特点
 
+- 支持多个 AI 提供商（千帆、Groq）
 - 支持多个地区，可配置名称和描述
 - 生成关于当地历史、文化、美食、景点和特产的独特问题
 - 检测并标记重复问题
@@ -19,8 +20,8 @@
 
 - Node.js (v14 或更高版本)
 - Bun 运行时
-- Groq API 密钥
-- 千帆 API 凭证（可选）
+- 千帆 API 凭证（使用千帆提供商）
+- Groq API 密钥（使用 Groq 提供商）
 
 ## 安装设置
 
@@ -35,14 +36,14 @@ cp .env.example .env
 ```
 4. 在 `.env` 中配置环境变量：
 ```
-GROQ_API_KEY=你的_groq_api_密钥            # 可选
-QIANFAN_ACCESS_KEY=你的_千帆_access_key    # 可选
-QIANFAN_SECRET_KEY=你的_千帆_secret_key    # 可选
+QIANFAN_ACCESS_KEY=你的_千帆_access_key    # 使用千帆提供商时必需
+QIANFAN_SECRET_KEY=你的_千帆_secret_key    # 使用千帆提供商时必需
+GROQ_API_KEY=你的_groq_api_密钥            # 使用 Groq 提供商时必需
 ```
 
 ## 使用方法
 
-脚本可以在三种模式下运行：
+### 使用千帆提供商（默认）
 
 1. 仅生成问题：
 ```bash
@@ -59,11 +60,21 @@ bun run start -- answers <地区拼音> [最大尝试次数]
 bun run start -- all <地区拼音> [问题数量]
 ```
 
+### 使用 Groq 提供商
+
+```bash
+bun run start:groq -- <模式> <地区拼音> [选项]
+```
+
 ### 参数说明
 
 - `地区拼音`：地区的拼音名称（例如："chibi" 代表赤壁）
 - `问题数量`：要生成的唯一问题数量（默认：10）
 - `最大尝试次数`：每个答案的最大生成尝试次数（默认：3）
+- `模式`：可选以下之一：
+  - `questions`：仅生成问题
+  - `answers`：仅生成答案
+  - `all`：同时生成问题和答案
 
 ### 添加新地区
 
@@ -111,6 +122,25 @@ export const regions: Region[] = [
   "content": "答案内容...",
   "reasoning_content": "思考过程..."
 }
+```
+
+## 项目结构
+
+```
+.
+├── config/             # 配置文件
+├── generators/         # 旧的生成器文件
+│   └── generate-groq.ts  # Groq 生成器
+├── providers/          # AI 提供商实现
+│   └── qianfan/       # 千帆提供商
+│       ├── client.ts  # 千帆客户端
+│       └── service.ts # 千帆服务
+├── types/             # TypeScript 类型定义
+├── utils/             # 工具函数
+│   ├── prompt.ts      # 提示工具
+│   ├── similarity.ts  # 相似度检查
+│   └── stream.ts      # 流处理工具
+└── index.ts           # 主入口文件
 ```
 
 ## 错误处理

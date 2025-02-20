@@ -85,4 +85,35 @@ export function extractContent(text: string): string {
   text = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const paragraphs = [...new Set(text.split('\n\n'))];
   return paragraphs.join('\n\n').slice(0, 2000);
+}
+
+/**
+ * Extracts a JSON array from a text string
+ * @param text - The text to extract JSON array from
+ * @returns The extracted JSON array string or empty string if not found
+ */
+export function extractJSONArray(text: string): string {
+  // Remove any non-printable characters and normalize whitespace
+  text = text.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+  
+  // Find the outermost array containing questions
+  const match = text.match(/\[\s*\{[^]*\}\s*\]/);
+  if (!match) {
+    // Try to find any JSON array
+    const arrayMatch = text.match(/\[[^\]]*\]/);
+    if (!arrayMatch) return '';
+    return arrayMatch[0];
+  }
+  
+  // Clean up the JSON string
+  return match[0]
+    .replace(/[\u0000-\u0019]+/g, '') // Remove control characters
+    .replace(/。}/g, '}') // Remove Chinese period before closing brace
+    .replace(/。"/g, '"') // Remove Chinese period before quotes
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(/,\s*]/g, ']') // Remove trailing commas
+    .replace(/,\s*,/g, ',') // Remove duplicate commas
+    .replace(/"\s*"/g, '","') // Fix adjacent quotes
+    .replace(/}\s*{/g, '},{') // Fix adjacent objects
+    .trim();
 } 
