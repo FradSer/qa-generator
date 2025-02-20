@@ -1,0 +1,21 @@
+{
+  "name": "qa-generator",
+  "main": "generate-groq.ts",
+  "type": "module",
+  "scripts": {
+    "start:groq": "bun run generate-groq.ts",
+    "start:qianfan": "bun run generate-qianfan.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@types/node": "^20.11.19",
+    "groq-sdk": "^0.15.0",
+    "dotenv": "^16.4.4",
+    "@baiducloud/qianfan": "^0.2.2"
+  }
+}
