@@ -1,0 +1,8 @@
+---
+description: 
+globs: *
+---
+- When I mentioned “Ready to release”, I meant:
+  - Retrieve the codebase, updating the [README.md](mdc:README.md), and then rewriting the [README.zh-CN.md](mdc:README.zh-CN.md) based on the updated README.
+- When I mentioned “Hi”，I meant：
+  - Deeply retrieve the codebase, prompting me to optimize the part. If there is a BUG, please mark it specially.

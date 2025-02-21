@@ -254,13 +254,13 @@ async function main_answers(
  * Main entry point for parallel question generation
  */
 async function main_questions_parallel(
-  totalQuestionCount: number,  // Total questions needed
+  totalQuestionCount: number,  // Target questions count (minimum)
   region: Region,
   workerCount: number,
-  maxPerWorker: number = 50,  // Maximum questions per worker
+  maxQPerWorker: number = 50,  // Fixed questions per worker
   maxRetries: number = 5      // Maximum number of retries for reaching target count
 ) {
-  console.log(`Target to generate ${totalQuestionCount} questions using ${workerCount} workers (max ${maxPerWorker} per worker)...`);
+  console.log(`Target to generate at least ${totalQuestionCount} questions using ${workerCount} workers (${maxQPerWorker} questions per worker)...`);
   
   const questionPool = new WorkerPool(workerCount, './workers/question-worker.ts');
   let retryCount = 0;
@@ -282,33 +282,20 @@ async function main_questions_parallel(
         console.log(`\nRetry #${retryCount}: Current questions count (${allQuestions.length}) is below target (${totalQuestionCount})`);
       }
 
-      // Calculate remaining questions needed
-      const remainingCount = totalQuestionCount - allQuestions.length;
-      
-      // Calculate optimal number of workers needed based on remaining count and max per worker
-      const optimalWorkerCount = Math.ceil(remainingCount / maxPerWorker);
-      const actualWorkerCount = Math.min(workerCount, optimalWorkerCount);
-      
-      // Calculate questions per worker for this batch
-      const basePerWorker = Math.min(maxPerWorker, Math.ceil(remainingCount / actualWorkerCount));
-      console.log(`\nBatch ${retryCount + 1}: Will use ${actualWorkerCount} workers to generate ${remainingCount} questions (approximately ${basePerWorker} per worker)`);
+      // Always use all workers with fixed question count
+      console.log(`\nBatch ${retryCount + 1}: Using ${workerCount} workers to generate ${maxQPerWorker} questions each (total: ${workerCount * maxQPerWorker})`);
       
       // Distribute work among workers
-      let remainingToDistribute = remainingCount;
       const tasks: Promise<Question[]>[] = [];
       
-      for (let i = 0; i < actualWorkerCount && remainingToDistribute > 0; i++) {
-        const workerBatchSize = Math.min(basePerWorker, remainingToDistribute);
-        if (workerBatchSize <= 0) break;
-
+      for (let i = 0; i < workerCount; i++) {
         const task: QuestionWorkerTask = {
           regionName: region.name,
-          batchSize: workerBatchSize,
+          batchSize: maxQPerWorker,  // Always use fixed size
           maxAttempts: 3,
           workerId: i + 1
         };
         tasks.push(questionPool.execute(task));
-        remainingToDistribute -= workerBatchSize;
       }
 
       // Wait for all workers in this batch to complete
@@ -339,7 +326,7 @@ async function main_questions_parallel(
       
       console.log(`\nBatch ${retryCount + 1} Summary:`);
       console.log(`- New unique questions added: ${newAddedCount}`);
-      console.log(`- Current total: ${allQuestions.length}/${totalQuestionCount}`);
+      console.log(`- Current total: ${allQuestions.length}/${totalQuestionCount} (target)`);
       console.log(`- Progress: ${((allQuestions.length / totalQuestionCount) * 100).toFixed(2)}%`);
 
       // If no new questions were added in this batch, increment retry counter
@@ -358,7 +345,10 @@ async function main_questions_parallel(
 
     // Final status
     if (allQuestions.length >= totalQuestionCount) {
-      console.log(`\n✅ Successfully generated target number of questions: ${allQuestions.length}/${totalQuestionCount}`);
+      console.log(`\n✅ Successfully generated more than target number of questions:`);
+      console.log(`- Final count: ${allQuestions.length}`);
+      console.log(`- Target count: ${totalQuestionCount}`);
+      console.log(`- Extra questions: +${allQuestions.length - totalQuestionCount}`);
     } else {
       console.log(`\n⚠️ Could not reach target count after ${maxRetries} retries:`);
       console.log(`- Final question count: ${allQuestions.length}/${totalQuestionCount}`);

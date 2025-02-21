@@ -17,6 +17,7 @@
   - 实时保存生成进度
 - **灵活配置**：可自定义问题数量和重试次数
 - **多线程处理**：利用多线程并行处理，提升生成效率
+- **智能输出**：结构化的 JSON 输出，包含问题、答案和推理过程
 
 ## 运行环境
 
@@ -72,10 +73,33 @@ bun run start [参数]
 
 可选参数：
 - `--count <数字>`：生成问题数量（默认：100）
+
+工作线程相关参数：
 - `--workers <数字>`：工作线程数（默认：CPU核心数-1）
-- `--attempts <数字>`：最大重试次数（默认：3）
 - `--batch <数字>`：批处理大小（默认：50）
 - `--delay <数字>`：批次间延迟（毫秒）（默认：1000）
+- `--attempts <数字>`：每个任务的最大重试次数（默认：3）
+
+### 工作线程系统
+
+应用采用多线程工作系统进行并行处理：
+
+- **架构**：
+  - 任务均匀分配给工作线程
+  - 每个工作线程独立处理其分配的批次
+  - 任务完成后自动清理工作线程
+  - 错误隔离机制防止故障级联
+
+- **性能优化**：
+  - 根据 CPU 调整线程数（`--workers`）
+  - 微调批处理大小以获得最佳吞吐量（`--batch`）
+  - 通过延迟控制 API 限流（`--delay`）
+  - 设置失败任务重试次数（`--attempts`）
+
+优化的工作线程配置示例：
+```bash
+bun run start --mode all --region chibi --workers 20 --batch 25 --delay 2000
+```
 
 ### 使用示例
 
@@ -119,7 +143,7 @@ export const regions: Region[] = [
 ];
 ```
 
-### 输出文件
+### 输出格式
 
 每个地区会生成两个 JSON 文件：
 
@@ -139,7 +163,7 @@ export const regions: Region[] = [
   {
     "question": "问题内容",
     "content": "答案内容",
-    "reasoning_content": "推理过程"
+    "reasoning_content": "推理过程和参考依据"
   }
 ]
 ```
@@ -149,24 +173,31 @@ export const regions: Region[] = [
 ```
 .
 ├── config/            # 配置文件
+├── data/             # 生成数据存储
 ├── generators/        # 问答生成器
-├── providers/         # AI 模型接入
-│   ├── groq/          # Groq 模型
-│   └── qianfan/       # 千帆模型
-├── prompts/           # AI 提示词模板
-├── types/             # TypeScript 类型定义
-├── utils/             # 工具函数
-├── workers/           # 多线程处理
-└── index.ts           # 主程序入口
+├── providers/        # AI 模型接入
+│   ├── groq/         # Groq 模型
+│   └── qianfan/      # 千帆模型
+├── prompts/          # AI 提示词模板
+├── types/            # TypeScript 类型定义
+├── utils/            # 工具函数
+├── workers/          # 多线程处理
+└── index.ts          # 主程序入口
 ```
 
 ## 错误处理
 
+本应用实现了强大的错误处理机制：
 - API 调用失败自动重试
 - 答案生成后自动保存进度
 - 智能检测并过滤重复问题
 - 详细的错误日志和堆栈追踪
+- 优雅的故障恢复和状态保存
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request 来帮助改进项目！ 
+欢迎提交 Issue 和 Pull Request 来帮助改进项目！
+
+## 许可证
+
+本项目基于 MIT 许可证开源 - 详见 LICENSE 文件 

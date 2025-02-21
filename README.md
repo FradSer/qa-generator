@@ -17,6 +17,7 @@ A sophisticated TypeScript application that leverages multiple AI providers to g
   - Progress auto-save after each answer
 - **Flexible Configuration**: Customizable question count and answer retry attempts
 - **Multi-threaded Processing**: Parallel processing with worker threads for improved performance
+- **Intelligent Output**: Structured JSON output with questions, answers, and reasoning content
 
 ## Prerequisites
 
@@ -68,14 +69,37 @@ Required options:
   - `questions`: Generate questions only
   - `answers`: Generate answers only
   - `all`: Generate both questions and answers
-- `--region <name>`: Region name in pinyin (e.g., "chibi" for 赤壁)
+- `--region <n>`: Region name in pinyin (e.g., "chibi" for 赤壁)
 
 Optional parameters:
 - `--count <number>`: Number of questions to generate (default: 100)
+
+Worker-related parameters:
 - `--workers <number>`: Number of worker threads (default: CPU cores - 1)
-- `--attempts <number>`: Maximum retry attempts (default: 3)
 - `--batch <number>`: Batch size for processing (default: 50)
 - `--delay <number>`: Delay between batches in milliseconds (default: 1000)
+- `--attempts <number>`: Maximum retry attempts per task (default: 3)
+
+### Worker System
+
+The application leverages a multi-threaded worker system for parallel processing:
+
+- **Architecture**:
+  - Tasks are evenly distributed among worker threads
+  - Each worker processes its assigned batch independently
+  - Workers are automatically cleaned up after task completion
+  - Error isolation prevents cascading failures
+
+- **Performance Optimization**:
+  - Adjust thread count based on your CPU (`--workers`)
+  - Fine-tune batch size for optimal throughput (`--batch`)
+  - Control API rate limiting with delays (`--delay`)
+  - Set retry attempts for failed tasks (`--attempts`)
+
+Example with optimized worker configuration:
+```bash
+bun run start --mode all --region chibi --workers 20 --batch 25 --delay 2000
+```
 
 ### Example Commands
 
@@ -119,7 +143,7 @@ export const regions: Region[] = [
 ];
 ```
 
-### Output Files
+### Output Format
 
 Each region generates two JSON files:
 
@@ -139,7 +163,7 @@ Each region generates two JSON files:
   {
     "question": "Question text",
     "content": "Answer content",
-    "reasoning_content": "Reasoning process"
+    "reasoning_content": "Reasoning process and references"
   }
 ]
 ```
@@ -148,25 +172,31 @@ Each region generates two JSON files:
 
 ```
 .
-├── config/            # Configuration files
-├── generators/        # Question and answer generators
-├── providers/         # AI provider implementations
-│   ├── groq/          # Groq provider
-│   └── qianfan/       # QianFan provider
-├── prompts/           # AI prompt templates
-├── types/             # TypeScript type definitions
-├── utils/             # Utility functions
-├── workers/           # Worker thread implementations
-└── index.ts           # Main entry point
+├── config/           # Configuration files
+├── generators/       # Question and answer generators
+├── providers/        # AI provider implementations
+│   ├── groq/         # Groq provider
+│   └── qianfan/      # QianFan provider
+├── prompts/          # AI prompt templates
+├── types/            # TypeScript type definitions
+├── utils/            # Utility functions
+├── workers/          # Worker thread implementations
+└── index.ts          # Main entry point
 ```
 
 ## Error Handling
 
+The application implements robust error handling:
 - Automatic retry for failed API requests
 - Progress saving after each successful answer
 - Duplicate question detection and filtering
 - Detailed error logging with stack traces
+- Graceful failure recovery with state preservation
 
 ## Contributing
 
 Issues and pull requests are welcome! Feel free to contribute to improve the project.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
