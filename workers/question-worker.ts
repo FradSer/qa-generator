@@ -64,6 +64,6 @@ self.onmessage = async (e: MessageEvent<QuestionWorkerTask>) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     Logger.error(`Error: ${errorMessage}`);
-    self.postMessage({ error: errorMessage });
+    self.postMessage(null);
   }
 }; 

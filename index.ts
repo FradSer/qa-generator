@@ -475,7 +475,7 @@ async function main_answers_parallel(
       
       // Process valid results
       const validResults = batchResults.filter((result): result is QAItem => 
-        result !== null && !('error' in result)
+        result !== null && typeof result === 'object' && 'question' in result && 'content' in result
       );
       
       Logger.info(`Valid results: ${validResults.length}/${batchResults.length}`);
