@@ -4,6 +4,7 @@ import { setupQianFanEnvironment } from '../providers/qianfan/client';
 import { qianfanService } from '../providers/qianfan/service';
 import type { Question } from '../types/types';
 import type { QuestionWorkerTask } from '../types/worker';
+import Logger from '../utils/logger';
 
 // Initialize the environment based on provider
 const provider = process.env.AI_PROVIDER?.toLowerCase() || 'qianfan';
@@ -24,9 +25,10 @@ if (provider === 'qianfan') {
  */
 self.onmessage = async (e: MessageEvent<QuestionWorkerTask>) => {
   const { regionName, batchSize, maxAttempts, workerId } = e.data;
+  Logger.setWorkerId(String(workerId));
   
   try {
-    console.log(`[Worker ${workerId}] Generating ${batchSize} questions for ${regionName}...`);
+    Logger.worker(`Generating ${batchSize} questions for ${regionName}...`);
     const result = await service.generateQuestionsFromPrompt(regionName, batchSize, maxAttempts);
     
     try {
@@ -52,16 +54,16 @@ self.onmessage = async (e: MessageEvent<QuestionWorkerTask>) => {
         throw new Error('No valid questions after filtering');
       }
       
-      console.log(`[Worker ${workerId}] Generated ${validQuestions.length} valid questions`);
+      Logger.success(`Generated ${validQuestions.length} valid questions`);
       self.postMessage(validQuestions);
     } catch (parseError) {
-      console.error(`[Worker ${workerId}] Failed to parse questions:`, parseError);
-      console.error('Raw result:', result);
+      Logger.error(`Failed to parse questions: ${parseError}`);
+      Logger.debug('Raw result: ' + result);
       throw parseError;
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    console.error(`[Worker ${workerId}] Error:`, errorMessage);
+    Logger.error(`Error: ${errorMessage}`);
     self.postMessage({ error: errorMessage });
   }
 }; 

@@ -6,6 +6,8 @@ declare class Worker {
   onerror: ((e: ErrorEvent) => void) | null;
 }
 
+import Logger from '../utils/logger';
+
 /**
  * A simple worker pool implementation for managing multiple worker threads
  */
@@ -13,6 +15,7 @@ export class WorkerPool {
   private workers: Worker[];
   private taskQueue: (() => Promise<any>)[];
   private busyWorkers: Set<Worker>;
+  private poolId: string;
 
   /**
    * Creates a new worker pool
@@ -23,15 +26,18 @@ export class WorkerPool {
     this.workers = Array.from({ length: size }, () => new Worker(workerScript));
     this.taskQueue = [];
     this.busyWorkers = new Set();
+    this.poolId = Math.random().toString(36).substring(7);
+    Logger.info(`Created worker pool with ${size} workers`, '👥');
 
     // Set up message handlers for each worker
-    this.workers.forEach(worker => {
+    this.workers.forEach((worker, index) => {
       worker.onmessage = (e) => {
         this.handleWorkerMessage(worker, e.data);
       };
       worker.onerror = (e) => {
         this.handleWorkerError(worker, e);
       };
+      Logger.debug(`Initialized worker ${index + 1}/${size}`);
     });
   }
 
@@ -47,16 +53,19 @@ export class WorkerPool {
       if (worker) {
         this.busyWorkers.add(worker);
         worker.postMessage(task);
+        Logger.debug(`Assigned task to worker (${this.busyWorkers.size}/${this.workers.length} busy)`);
         
         const messageHandler = (e: MessageEvent) => {
           worker.onmessage = null;
           this.busyWorkers.delete(worker);
+          Logger.debug(`Task completed (${this.busyWorkers.size}/${this.workers.length} busy)`);
           resolve(e.data as T);
         };
         
         const errorHandler = (e: ErrorEvent) => {
           worker.onerror = null;
           this.busyWorkers.delete(worker);
+          Logger.error(`Worker error: ${e.message}`);
           reject(e);
         };
         
@@ -64,6 +73,7 @@ export class WorkerPool {
         worker.onerror = errorHandler;
       } else {
         // Queue the task if no worker is available
+        Logger.debug(`No workers available, queuing task (${this.taskQueue.length + 1} tasks queued)`);
         this.taskQueue.push(async () => {
           try {
             const result = await this.execute<T>(task);
@@ -95,6 +105,7 @@ export class WorkerPool {
     // Process next task in queue if any
     if (this.taskQueue.length > 0) {
       const nextTask = this.taskQueue.shift();
+      Logger.debug(`Processing next queued task (${this.taskQueue.length} remaining)`);
       nextTask?.();
     }
   }
@@ -105,12 +116,13 @@ export class WorkerPool {
    * @param error - ErrorEvent
    */
   private handleWorkerError(worker: Worker, error: ErrorEvent) {
-    console.error('Worker error:', error);
+    Logger.error(`Worker error: ${error.message}`);
     this.busyWorkers.delete(worker);
     
     // Process next task in queue if any
     if (this.taskQueue.length > 0) {
       const nextTask = this.taskQueue.shift();
+      Logger.debug(`Processing next queued task after error (${this.taskQueue.length} remaining)`);
       nextTask?.();
     }
   }
@@ -119,6 +131,7 @@ export class WorkerPool {
    * Terminates all workers in the pool
    */
   terminate() {
+    Logger.info(`Terminating worker pool with ${this.workers.length} workers`);
     this.workers.forEach(worker => worker.terminate());
   }
 } 

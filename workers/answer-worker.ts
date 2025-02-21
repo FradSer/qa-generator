@@ -4,6 +4,7 @@ import { setupQianFanEnvironment } from '../providers/qianfan/client';
 import { qianfanService } from '../providers/qianfan/service';
 import type { QAItem } from '../types/types';
 import type { AnswerWorkerTask } from '../types/worker';
+import Logger from '../utils/logger';
 
 // Initialize the environment based on provider
 const provider = process.env.AI_PROVIDER?.toLowerCase() || 'qianfan';
@@ -24,9 +25,10 @@ if (provider === 'qianfan') {
  */
 self.onmessage = async (e: MessageEvent<AnswerWorkerTask>) => {
   const { question, maxAttempts, workerId } = e.data;
+  Logger.setWorkerId(String(workerId));
   
   try {
-    console.log(`[Worker ${workerId}] Generating answer for: ${question.slice(0, 50)}...`);
+    Logger.worker(`Generating answer for: ${question.slice(0, 50)}...`);
     const result = await service.generateAnswer(question, maxAttempts);
     
     try {
@@ -51,16 +53,16 @@ self.onmessage = async (e: MessageEvent<AnswerWorkerTask>) => {
         reasoning_content: result.reasoning_content?.trim() || '未提供思考过程'
       };
       
-      console.log(`[Worker ${workerId}] Generated valid answer`);
+      Logger.success('Generated valid answer');
       self.postMessage(validAnswer); 
     } catch (validationError) {
-      console.error(`[Worker ${workerId}] Validation error:`, validationError);
-      console.error('Raw result:', result);
+      Logger.error(`Validation error: ${validationError}`);
+      Logger.debug('Raw result: ' + JSON.stringify(result, null, 2));
       throw validationError;
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    console.error(`[Worker ${workerId}] Error:`, errorMessage);
+    Logger.error(`Error: ${errorMessage}`);
     self.postMessage({ error: errorMessage });
   }
 }; 

@@ -7,8 +7,16 @@ import { setupQianFanEnvironment } from './providers/qianfan/client';
 import { qianfanService } from './providers/qianfan/service';
 import type { QAItem, Question } from './types/types';
 import type { AnswerWorkerTask, QuestionWorkerTask } from './types/worker';
+import Logger from './utils/logger';
 import { isTooSimilar } from './utils/similarity';
 import { WorkerPool } from './workers/worker-pool';
+
+// Configure logger
+Logger.configure({
+  showTimestamp: true,
+  showLevel: true,
+  showEmoji: true
+});
 
 // MARK: - Question Generation Pipeline
 /**
@@ -33,16 +41,16 @@ async function generateQuestions(
     const existingQuestionsData = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
     questions = existingQuestionsData;
     existingQuestionsData.forEach(q => existingQuestions.add(q.question));
-    console.log(`Loaded ${questions.length} existing questions for similarity check`);
+    Logger.info(`Loaded ${questions.length} existing questions for similarity check`);
     
     const answeredCount = existingQuestionsData.filter(q => q.is_answered).length;
-    console.log(`Current stats: ${answeredCount} answered, ${existingQuestionsData.length - answeredCount} unanswered`);
+    Logger.info(`Current stats: ${answeredCount} answered, ${existingQuestionsData.length - answeredCount} unanswered`);
   } catch (error) {
-    console.log('No existing questions found, starting fresh');
+    Logger.info('No existing questions found, starting fresh');
   }
 
   if (questions.length >= count) {
-    console.log(`Already have ${questions.length} questions, no need to generate more.`);
+    Logger.info(`Already have ${questions.length} questions, no need to generate more.`);
     return questions;
   }
 
@@ -51,7 +59,7 @@ async function generateQuestions(
   
   while (remainingCount > 0) {
     const batchSize = Math.min(50, remainingCount);
-    console.log(`\nGenerating batch of ${batchSize} questions (${totalNewQuestions}/${count - questions.length} total)...`);
+    Logger.process(`\nGenerating batch of ${batchSize} questions (${totalNewQuestions}/${count - questions.length} total)...`);
     
     let batchSuccess = false;
     
@@ -64,17 +72,17 @@ async function generateQuestions(
           parsedQuestions = JSON.parse(result) as Question[];
           
           if (!Array.isArray(parsedQuestions)) {
-            console.error('Parsed result is not an array');
+            Logger.error('Parsed result is not an array');
             continue;
           }
           
           if (parsedQuestions.length === 0) {
-            console.error('No valid questions found in parsed result');
+            Logger.error('No valid questions found in parsed result');
             continue;
           }
         } catch (error) {
-          console.error('Failed to parse JSON:', error);
-          console.error('Received JSON string:', result);
+          Logger.error('Failed to parse JSON', error);
+          Logger.debug('Received JSON string: ' + result);
           continue;
         }
         
@@ -87,13 +95,13 @@ async function generateQuestions(
           }
           
           if (existingQuestions.has(q.question)) {
-            console.log(`Skipping duplicate question: ${q.question}`);
+            Logger.debug(`Skipping duplicate question: ${q.question}`);
             skippedQuestions++;
             continue;
           }
           
           if (isTooSimilar(q.question, Array.from(existingQuestions), region.name)) {
-            console.log(`Skipping similar question: ${q.question}`);
+            Logger.debug(`Skipping similar question: ${q.question}`);
             skippedQuestions++;
             continue;
           }
@@ -102,25 +110,25 @@ async function generateQuestions(
           existingQuestions.add(q.question);
           newQuestionsAdded++;
           totalNewQuestions++;
-          console.log(`New unique question added: ${q.question}`);
+          Logger.success(`New unique question added: ${q.question}`);
           
           writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
         }
         
-        console.log(`\nBatch summary:`);
-        console.log(`- New questions added: ${newQuestionsAdded}`);
-        console.log(`- Questions skipped: ${skippedQuestions}`);
-        console.log(`- Total new questions so far: ${totalNewQuestions}/${count - questions.length}`);
+        Logger.info('\nBatch summary:');
+        Logger.info(`- New questions added: ${newQuestionsAdded}`);
+        Logger.info(`- Questions skipped: ${skippedQuestions}`);
+        Logger.info(`- Total new questions so far: ${totalNewQuestions}/${count - questions.length}`);
         
         if (newQuestionsAdded > 0) {
           batchSuccess = true;
           remainingCount = count - questions.length;
         } else {
-          console.log('\nNo new questions added in this batch attempt, will try again...');
+          Logger.warn('\nNo new questions added in this batch attempt, will try again...');
         }
         
       } catch (error) {
-        console.error(`Error in batch attempt ${attempt}:`, error);
+        Logger.error(`Error in batch attempt ${attempt}`, error);
       }
       
       if (!batchSuccess && attempt < maxAttempts) {
@@ -129,14 +137,14 @@ async function generateQuestions(
     }
     
     if (!batchSuccess) {
-      console.log(`\nFailed to generate questions after ${maxAttempts} attempts, taking a longer break...`);
+      Logger.warn(`\nFailed to generate questions after ${maxAttempts} attempts, taking a longer break...`);
       await new Promise(resolve => setTimeout(resolve, 10000));
     }
   }
 
-  console.log(`\nFinal results:`);
-  console.log(`- Total questions in file: ${questions.length}`);
-  console.log(`- New questions added: ${totalNewQuestions}`);
+  Logger.success('\nFinal results:');
+  Logger.info(`- Total questions in file: ${questions.length}`);
+  Logger.info(`- New questions added: ${totalNewQuestions}`);
   
   return questions;
 }
@@ -158,11 +166,11 @@ async function generateAnswers(
   
   try {
     const questions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
-    console.log(`Loaded ${questions.length} questions from ${questionFile}`);
+    Logger.info(`Loaded ${questions.length} questions from ${questionFile}`);
     
     try {
       qaItems = JSON.parse(readFileSync(qaFile, 'utf-8')) as QAItem[];
-      console.log(`Loaded ${qaItems.length} existing answers from ${qaFile}`);
+      Logger.info(`Loaded ${qaItems.length} existing answers from ${qaFile}`);
       
       const answeredQuestions = new Set(qaItems.map(item => item.question));
       questions.forEach(q => {
@@ -171,19 +179,19 @@ async function generateAnswers(
       
       writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
     } catch (error) {
-      console.log('No existing answers found, starting from scratch');
+      Logger.info('No existing answers found, starting from scratch');
     }
     
     const remainingQuestions = questions.filter(q => !q.is_answered);
     
-    console.log(`Found ${remainingQuestions.length} questions without answers`);
+    Logger.info(`Found ${remainingQuestions.length} questions without answers`);
     
     for (let i = 0; i < remainingQuestions.length; i++) {
       try {
-        console.log(`\nGetting answer for question ${i + 1}/${remainingQuestions.length}:`);
-        console.log(remainingQuestions[i].question);
+        Logger.process(`\nGetting answer for question ${i + 1}/${remainingQuestions.length}:`);
+        Logger.info(remainingQuestions[i].question);
         const qaItem = await generateAnswer(remainingQuestions[i].question, maxAnswerAttempts);
-        console.log('Answer received:', qaItem.content.slice(0, 100) + '...');
+        Logger.success('Answer received: ' + qaItem.content.slice(0, 100) + '...');
         qaItems.push(qaItem);
         
         const questionIndex = questions.findIndex(q => q.question === remainingQuestions[i].question);
@@ -193,28 +201,25 @@ async function generateAnswers(
         }
         
         // Log the QA file path
-        console.log('Writing to QA file:', qaFile);
-
-        // Log the QA items to be written
-        console.log('QA Items to write:', qaItems);
+        Logger.debug('Writing to QA file: ' + qaFile);
 
         try {
           writeFileSync(qaFile, JSON.stringify(qaItems, null, 2), 'utf-8');
-          console.log('Successfully wrote to QA file.');
+          Logger.success('Successfully wrote to QA file.');
         } catch (error) {
-          console.error('Error writing to QA file:', error);
+          Logger.error('Error writing to QA file: ' + error);
         }
         
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
-        console.error(`Error getting answer for question:`, error);
+        Logger.error('Error getting answer for question: ' + error);
       }
     }
     
-    console.log(`\nCompleted answer generation:`);
-    console.log(`- Total QA pairs: ${qaItems.length}`);
+    Logger.success('\nCompleted answer generation:');
+    Logger.info(`- Total QA pairs: ${qaItems.length}`);
   } catch (error) {
-    console.error('Error reading questions file:', error);
+    Logger.error('Error reading questions file: ' + error);
   }
 }
 
@@ -228,14 +233,14 @@ async function main_questions(
   maxAttempts: number = 3,
   generateQuestionsFromPrompt: (regionName: string, batchSize: number, maxAttempts: number) => Promise<string>
 ) {
-  console.log(`Generating questions for ${region.name}...`);
+  Logger.process(`Generating questions for ${region.name}...`);
   const questions = await generateQuestions(questionCount, region, maxAttempts, generateQuestionsFromPrompt);
   const uniqueQuestions = questions.filter(q => !q.is_answered).length;
   const answeredQuestions = questions.filter(q => q.is_answered).length;
-  console.log(`\nFinal results:`);
-  console.log(`- Total questions: ${questions.length}`);
-  console.log(`- Unique questions: ${uniqueQuestions}`);
-  console.log(`- Answered questions: ${answeredQuestions}`);
+  Logger.success('\nFinal results:');
+  Logger.info(`- Total questions: ${questions.length}`);
+  Logger.info(`- Unique questions: ${uniqueQuestions}`);
+  Logger.info(`- Answered questions: ${answeredQuestions}`);
 }
 
 /**
@@ -246,7 +251,7 @@ async function main_answers(
   maxAnswerAttempts: number = 3,
   generateAnswer: (question: string, maxAttempts: number) => Promise<QAItem>
 ) {
-  console.log(`Getting answers for ${region.name}...`);
+  Logger.process(`Getting answers for ${region.name}...`);
   await generateAnswers(region, maxAnswerAttempts, generateAnswer);
 }
 
@@ -260,7 +265,7 @@ async function main_questions_parallel(
   maxQPerWorker: number = 50,  // Fixed questions per worker
   maxRetries: number = 5      // Maximum number of retries for reaching target count
 ) {
-  console.log(`Target to generate at least ${totalQuestionCount} questions using ${workerCount} workers (${maxQPerWorker} questions per worker)...`);
+  Logger.process(`Target to generate at least ${totalQuestionCount} questions using ${workerCount} workers (${maxQPerWorker} questions per worker)...`);
   
   const questionPool = new WorkerPool(workerCount, './workers/question-worker.ts');
   let retryCount = 0;
@@ -271,19 +276,19 @@ async function main_questions_parallel(
     const { questionFile } = getRegionFileNames(region.pinyin);
     try {
       allQuestions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
-      console.log(`Loaded ${allQuestions.length} existing questions`);
+      Logger.info(`Loaded ${allQuestions.length} existing questions`);
     } catch (error) {
-      console.log('No existing questions found, starting fresh');
+      Logger.info('No existing questions found, starting fresh');
     }
 
     // Keep generating until we reach the target or max retries
     while (allQuestions.length < totalQuestionCount && retryCount < maxRetries) {
       if (retryCount > 0) {
-        console.log(`\nRetry #${retryCount}: Current questions count (${allQuestions.length}) is below target (${totalQuestionCount})`);
+        Logger.process(`\nRetry #${retryCount}: Current questions count (${allQuestions.length}) is below target (${totalQuestionCount})`);
       }
 
       // Always use all workers with fixed question count
-      console.log(`\nBatch ${retryCount + 1}: Using ${workerCount} workers to generate ${maxQPerWorker} questions each (total: ${workerCount * maxQPerWorker})`);
+      Logger.process(`\nBatch ${retryCount + 1}: Using ${workerCount} workers to generate ${maxQPerWorker} questions each (total: ${workerCount * maxQPerWorker})`);
       
       // Distribute work among workers
       const tasks: Promise<Question[]>[] = [];
@@ -310,7 +315,8 @@ async function main_questions_parallel(
       for (const q of newQuestions) {
         // Skip invalid questions
         if (!q || typeof q.question !== 'string' || !q.question.trim()) {
-          console.log('Skipping invalid question:', q);
+          Logger.process('Skipping invalid question:');
+          Logger.debug(JSON.stringify(q));
           continue;
         }
 
@@ -324,20 +330,20 @@ async function main_questions_parallel(
       // Save progress after each batch
       writeFileSync(questionFile, JSON.stringify(allQuestions, null, 2), 'utf-8');
       
-      console.log(`\nBatch ${retryCount + 1} Summary:`);
-      console.log(`- New unique questions added: ${newAddedCount}`);
-      console.log(`- Current total: ${allQuestions.length}/${totalQuestionCount} (target)`);
-      console.log(`- Progress: ${((allQuestions.length / totalQuestionCount) * 100).toFixed(2)}%`);
+      Logger.process(`\nBatch ${retryCount + 1} Summary:`);
+      Logger.info(`- New unique questions added: ${newAddedCount}`);
+      Logger.info(`- Current total: ${allQuestions.length}/${totalQuestionCount} (target)`);
+      Logger.info(`- Progress: ${((allQuestions.length / totalQuestionCount) * 100).toFixed(2)}%`);
 
       // If no new questions were added in this batch, increment retry counter
       if (newAddedCount === 0) {
         retryCount++;
-        console.log(`\nNo new questions added in this batch. Retry ${retryCount}/${maxRetries}`);
+        Logger.process(`\nNo new questions added in this batch. Retry ${retryCount}/${maxRetries}`);
         
         // Add a delay before next retry to avoid rate limiting
         if (retryCount < maxRetries) {
           const delayTime = 5000 * retryCount; // Increasing delay with each retry
-          console.log(`Waiting ${delayTime/1000} seconds before next attempt...`);
+          Logger.process(`Waiting ${delayTime/1000} seconds before next attempt...`);
           await new Promise(resolve => setTimeout(resolve, delayTime));
         }
       }
@@ -345,14 +351,14 @@ async function main_questions_parallel(
 
     // Final status
     if (allQuestions.length >= totalQuestionCount) {
-      console.log(`\n✅ Successfully generated more than target number of questions:`);
-      console.log(`- Final count: ${allQuestions.length}`);
-      console.log(`- Target count: ${totalQuestionCount}`);
-      console.log(`- Extra questions: +${allQuestions.length - totalQuestionCount}`);
+      Logger.success(`\n✅ Successfully generated more than target number of questions:`);
+      Logger.info(`- Final count: ${allQuestions.length}`);
+      Logger.info(`- Target count: ${totalQuestionCount}`);
+      Logger.info(`- Extra questions: +${allQuestions.length - totalQuestionCount}`);
     } else {
-      console.log(`\n⚠️ Could not reach target count after ${maxRetries} retries:`);
-      console.log(`- Final question count: ${allQuestions.length}/${totalQuestionCount}`);
-      console.log(`- Achievement rate: ${((allQuestions.length / totalQuestionCount) * 100).toFixed(2)}%`);
+      Logger.warn(`\n⚠️ Could not reach target count after ${maxRetries} retries:`);
+      Logger.info(`- Final question count: ${allQuestions.length}/${totalQuestionCount}`);
+      Logger.info(`- Achievement rate: ${((allQuestions.length / totalQuestionCount) * 100).toFixed(2)}%`);
     }
     
     return allQuestions;
@@ -370,23 +376,23 @@ async function main_answers_parallel(
   options: { maxAttempts: number; batchDelay: number; batchSize: number },
   regionPinyin: string
 ) {
-  console.log(`Generating answers using ${workerCount} workers...`);
-  console.log(`Options: maxAttempts=${options.maxAttempts}, batchSize=${options.batchSize}, delay=${options.batchDelay}ms`);
+  Logger.process(`Generating answers using ${workerCount} workers...`);
+  Logger.process(`Options: maxAttempts=${options.maxAttempts}, batchSize=${options.batchSize}, delay=${options.batchDelay}ms`);
   
   const answerPool = new WorkerPool(workerCount, './workers/answer-worker.ts');
   const { qaFile, questionFile } = getRegionFileNames(regionPinyin);
   
-  console.log('Initialized worker pool and got file paths:');
-  console.log('- QA File:', qaFile);
-  console.log('- Question File:', questionFile);
+  Logger.process('Initialized worker pool and got file paths:');
+  Logger.info('- QA File:', qaFile);
+  Logger.info('- Question File:', questionFile);
   
   // Load existing answers first
   let existingAnswers: QAItem[] = [];
   try {
     existingAnswers = JSON.parse(readFileSync(qaFile, 'utf-8')) as QAItem[];
-    console.log(`Loaded ${existingAnswers.length} existing answers`);
+    Logger.info(`Loaded ${existingAnswers.length} existing answers`);
   } catch (error) {
-    console.log('No existing answers found, starting fresh');
+    Logger.info('No existing answers found, starting fresh');
   }
 
   // Create a set of answered questions for quick lookup
@@ -397,20 +403,20 @@ async function main_answers_parallel(
     q.is_answered = answeredQuestions.has(q.question);
   });
   
-  console.log('Writing updated question status to file...');
+  Logger.process('Writing updated question status to file...');
   try {
     writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
-    console.log('Successfully updated question file');
+    Logger.success('Successfully updated question file');
   } catch (error) {
-    console.error('Error updating question file:', error);
+    Logger.error('Error updating question file', error);
   }
 
   // Get unanswered questions
   const unansweredQuestions = questions.filter(q => !q.is_answered);
-  console.log(`Found ${unansweredQuestions.length} questions without answers`);
+  Logger.info(`Found ${unansweredQuestions.length} questions without answers`);
 
   if (unansweredQuestions.length === 0) {
-    console.log('No unanswered questions found, nothing to do');
+    Logger.info('No unanswered questions found, nothing to do');
     return existingAnswers;
   }
 
@@ -422,10 +428,10 @@ async function main_answers_parallel(
   // 如果最后一批的大小小于等于10%的worker数，减少一个批次
   if (lastBatchSize > 0 && lastBatchSize <= tenPercentWorkers) {
     totalBatches--;
-    console.log(`Last batch size (${lastBatchSize}) is <= 10% of workers, merging with previous batch`);
+    Logger.process(`Last batch size (${lastBatchSize}) is <= 10% of workers, merging with previous batch`);
   }
   
-  console.log(`Will process in ${totalBatches} batches using ${workerCount} workers`);
+  Logger.process(`Will process in ${totalBatches} batches using ${workerCount} workers`);
 
   // 按批次处理
   for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -442,8 +448,8 @@ async function main_answers_parallel(
     
     const batchQuestions = unansweredQuestions.slice(start, end);
     
-    console.log(`\nProcessing batch ${batchIndex + 1}/${totalBatches}`);
-    console.log(`Batch size: ${batchQuestions.length} questions`);
+    Logger.process(`\nProcessing batch ${batchIndex + 1}/${totalBatches}`);
+    Logger.info(`Batch size: ${batchQuestions.length} questions`);
 
     const tasks: Promise<QAItem>[] = [];
 
@@ -452,7 +458,7 @@ async function main_answers_parallel(
       const workerId = i + 1;
       const question = batchQuestions[i];
       
-      console.log(`Assigning question to worker ${workerId}: ${question.question.slice(0, 50)}...`);
+      Logger.process(`Assigning question to worker ${workerId}: ${question.question.slice(0, 50)}...`);
       
       const task: AnswerWorkerTask = {
         question: question.question,
@@ -463,22 +469,22 @@ async function main_answers_parallel(
     }
 
     try {
-      console.log(`Waiting for batch ${batchIndex + 1} results...`);
+      Logger.process(`Waiting for batch ${batchIndex + 1} results...`);
       const batchResults = await Promise.all(tasks.splice(0, tasks.length));
-      console.log(`Received ${batchResults.length} results from workers`);
+      Logger.info(`Received ${batchResults.length} results from workers`);
       
       // Process valid results
       const validResults = batchResults.filter((result): result is QAItem => 
         result !== null && !('error' in result)
       );
       
-      console.log(`Valid results: ${validResults.length}/${batchResults.length}`);
+      Logger.info(`Valid results: ${validResults.length}/${batchResults.length}`);
       
       if (validResults.length > 0) {
         // Add new answers
         for (const result of validResults) {
           if (!answeredQuestions.has(result.question)) {
-            console.log(`Adding new answer for question: ${result.question.slice(0, 50)}...`);
+            Logger.process(`Adding new answer for question: ${result.question.slice(0, 50)}...`);
             existingAnswers.push(result);
             answeredQuestions.add(result.question);
             
@@ -491,41 +497,41 @@ async function main_answers_parallel(
         }
         
         // Save results after each successful batch
-        console.log('Writing results to files...');
+        Logger.process('Writing results to files...');
         try {
           writeFileSync(qaFile, JSON.stringify(existingAnswers, null, 2), 'utf-8');
           writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
-          console.log('Successfully saved batch results');
+          Logger.success('Successfully saved batch results');
         } catch (error) {
-          console.error('Error saving batch results:', error);
+          Logger.error('Error saving batch results', error);
         }
         
-        console.log(`Progress: ${existingAnswers.length}/${questions.length} total answers`);
+        Logger.info(`Progress: ${existingAnswers.length}/${questions.length} total answers`);
       }
 
       // Add delay between batches if not the last batch
       if (batchIndex < totalBatches - 1) {
-        console.log(`Waiting ${options.batchDelay}ms before next batch...`);
+        Logger.process(`Waiting ${options.batchDelay}ms before next batch...`);
         await new Promise(resolve => setTimeout(resolve, options.batchDelay));
       }
     } catch (error) {
-      console.error(`Error processing batch:`, error);
+      Logger.error('Error processing batch', error);
       // Save current progress even if batch fails
       try {
-        console.log('Saving current progress after error...');
+        Logger.process('Saving current progress after error...');
         writeFileSync(qaFile, JSON.stringify(existingAnswers, null, 2), 'utf-8');
         writeFileSync(questionFile, JSON.stringify(questions, null, 2), 'utf-8');
-        console.log('Successfully saved current progress');
+        Logger.success('Successfully saved current progress');
       } catch (saveError) {
-        console.error('Error saving current progress:', saveError);
+        Logger.error('Error saving current progress', saveError);
       }
     }
   }
 
   try {
-    console.log(`\nGeneration complete!`);
-    console.log(`Total answers in file: ${existingAnswers.length}`);
-    console.log(`Questions answered: ${questions.filter(q => q.is_answered).length}/${questions.length}`);
+    Logger.success(`\nGeneration complete!`);
+    Logger.info(`Total answers in file: ${existingAnswers.length}`);
+    Logger.info(`Questions answered: ${questions.filter(q => q.is_answered).length}/${questions.length}`);
     
     return existingAnswers;
   } finally {
@@ -558,14 +564,14 @@ async function main() {
     const value = args[i + 1];
     
     if (!value) {
-      console.error(`Error: Missing value for argument ${key}`);
+      Logger.error(`Error: Missing value for argument ${key}`);
       process.exit(1);
     }
 
     switch (key) {
       case 'mode':
         if (!['questions', 'answers', 'all'].includes(value)) {
-          console.error('Error: Invalid mode. Must be one of: questions, answers, all');
+          Logger.error('Error: Invalid mode. Must be one of: questions, answers, all');
           process.exit(1);
         }
         options.mode = value;
@@ -576,7 +582,7 @@ async function main() {
       case 'count':
         const count = parseInt(value);
         if (isNaN(count) || count <= 0) {
-          console.error('Error: count must be a positive number');
+          Logger.error('Error: count must be a positive number');
           process.exit(1);
         }
         options.totalCount = count;
@@ -584,7 +590,7 @@ async function main() {
       case 'workers':
         const workers = parseInt(value);
         if (isNaN(workers) || workers <= 0) {
-          console.error('Error: workers must be a positive number');
+          Logger.error('Error: workers must be a positive number');
           process.exit(1);
         }
         options.workerCount = workers;
@@ -592,7 +598,7 @@ async function main() {
       case 'max-q-per-worker':  // Renamed from max-per-worker
         const maxQPerWorker = parseInt(value);
         if (isNaN(maxQPerWorker) || maxQPerWorker <= 0) {
-          console.error('Error: max-q-per-worker must be a positive number');
+          Logger.error('Error: max-q-per-worker must be a positive number');
           process.exit(1);
         }
         options.maxQPerWorker = maxQPerWorker;
@@ -600,7 +606,7 @@ async function main() {
       case 'attempts':
         const attempts = parseInt(value);
         if (isNaN(attempts) || attempts <= 0) {
-          console.error('Error: attempts must be a positive number');
+          Logger.error('Error: attempts must be a positive number');
           process.exit(1);
         }
         options.maxAttempts = attempts;
@@ -608,7 +614,7 @@ async function main() {
       case 'batch':
         const batch = parseInt(value);
         if (isNaN(batch) || batch <= 0) {
-          console.error('Error: batch must be a positive number');
+          Logger.error('Error: batch must be a positive number');
           process.exit(1);
         }
         options.batchSize = batch;
@@ -616,45 +622,45 @@ async function main() {
       case 'delay':
         const delay = parseInt(value);
         if (isNaN(delay) || delay < 0) {
-          console.error('Error: delay must be a non-negative number');
+          Logger.error('Error: delay must be a non-negative number');
           process.exit(1);
         }
         options.delay = delay;
         break;
       default:
-        console.error(`Error: Unknown argument ${key}`);
+        Logger.error(`Error: Unknown argument ${key}`);
         process.exit(1);
     }
   }
 
   // Validate required arguments
   if (!options.mode || !options.region) {
-    console.error('Error: Missing required arguments');
-    console.error('Usage:');
-    console.error('  bun run start --mode <type> --region <name> [options]');
-    console.error('');
-    console.error('Required:');
-    console.error('  --mode <type>    Operation mode (questions|answers|all)');
-    console.error('  --region <name>  Region name in pinyin');
-    console.error('');
-    console.error('Optional:');
-    console.error('  --count <number>            Total questions to generate (default: 1000)');
-    console.error('  --workers <number>          Number of worker threads (default: 5)');
-    console.error('  --max-q-per-worker <number> Maximum questions per worker (default: 50)');
-    console.error('  --attempts <number>         Maximum retry attempts (default: 3)');
-    console.error('  --batch <number>            Batch size for processing (default: 50)');
-    console.error('  --delay <number>            Delay between batches in ms (default: 1000)');
+    Logger.error('Error: Missing required arguments');
+    Logger.error('Usage:');
+    Logger.error('  bun run start --mode <type> --region <name> [options]');
+    Logger.error('');
+    Logger.error('Required:');
+    Logger.error('  --mode <type>    Operation mode (questions|answers|all)');
+    Logger.error('  --region <name>  Region name in pinyin');
+    Logger.error('');
+    Logger.error('Optional:');
+    Logger.error('  --count <number>            Total questions to generate (default: 1000)');
+    Logger.error('  --workers <number>          Number of worker threads (default: 5)');
+    Logger.error('  --max-q-per-worker <number> Maximum questions per worker (default: 50)');
+    Logger.error('  --attempts <number>         Maximum retry attempts (default: 3)');
+    Logger.error('  --batch <number>            Batch size for processing (default: 50)');
+    Logger.error('  --delay <number>            Delay between batches in ms (default: 1000)');
     process.exit(1);
   }
 
   const region = getRegionByPinyin(options.region);
   if (!region) {
-    console.error(`Error: Region "${options.region}" not found`);
+    Logger.error(`Error: Region "${options.region}" not found`);
     process.exit(1);
   }
 
-  console.log(`Using ${provider.toUpperCase()} as AI provider`);
-  console.log('Options:', options);
+  Logger.info(`Using ${provider.toUpperCase()} as AI provider`);
+  Logger.debug('Options: ' + JSON.stringify(options, null, 2));
 
   // Setup provider environment
   try {
@@ -669,7 +675,7 @@ async function main() {
         throw new Error(`Unsupported AI provider: ${provider}`);
     }
   } catch (error) {
-    console.error(`Failed to setup ${provider} environment:`, error);
+    Logger.error(`Failed to setup ${provider} environment`, error);
     process.exit(1);
   }
 
@@ -685,7 +691,7 @@ async function main() {
     
     // Handle question generation
     if (options.mode === 'questions' || options.mode === 'all') {
-      console.log('\n=== Question Generation Phase ===');
+      Logger.info('\n=== Question Generation Phase ===');
       questions = await main_questions_parallel(
         options.totalCount,
         region,
@@ -695,24 +701,24 @@ async function main() {
       
       const totalGenerated = questions.length;
       const targetCount = options.totalCount;
-      console.log(`\nQuestion Generation Summary:`);
-      console.log(`- Target count: ${targetCount}`);
-      console.log(`- Total generated: ${totalGenerated}`);
-      console.log(`- Generation rate: ${((totalGenerated / targetCount) * 100).toFixed(2)}%`);
+      Logger.info(`\nQuestion Generation Summary:`);
+      Logger.info(`- Target count: ${targetCount}`);
+      Logger.info(`- Total generated: ${totalGenerated}`);
+      Logger.info(`- Generation rate: ${((totalGenerated / targetCount) * 100).toFixed(2)}%`);
     }
     
     // Handle answer generation
     if (options.mode === 'answers' || options.mode === 'all') {
-      console.log('\n=== Answer Generation Phase ===');
+      Logger.info('\n=== Answer Generation Phase ===');
       
       // If we're in 'answers' mode or if we need to load questions
       if (options.mode === 'answers' || questions.length === 0) {
         const { questionFile } = getRegionFileNames(region.pinyin);
         try {
           questions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
-          console.log(`Loaded ${questions.length} questions from file`);
+          Logger.info(`Loaded ${questions.length} questions from file`);
         } catch (error) {
-          console.error('Error loading questions file:', error);
+          Logger.error('Error loading questions file', error);
           process.exit(1);
         }
       }
@@ -722,10 +728,10 @@ async function main() {
       const answeredBefore = questions.filter(q => q.is_answered).length;
       const unansweredBefore = totalQuestions - answeredBefore;
       
-      console.log(`\nPre-generation Status:`);
-      console.log(`- Total questions: ${totalQuestions}`);
-      console.log(`- Already answered: ${answeredBefore}`);
-      console.log(`- Pending answers: ${unansweredBefore}`);
+      Logger.info(`\nPre-generation Status:`);
+      Logger.info(`- Total questions: ${totalQuestions}`);
+      Logger.info(`- Already answered: ${answeredBefore}`);
+      Logger.info(`- Pending answers: ${unansweredBefore}`);
 
       if (unansweredBefore > 0) {
         answers = await main_answers_parallel(
@@ -743,39 +749,39 @@ async function main() {
         const answeredAfter = answers.length;
         const newlyAnswered = answeredAfter - answeredBefore;
         
-        console.log(`\nAnswer Generation Summary:`);
-        console.log(`- Previously answered: ${answeredBefore}`);
-        console.log(`- Newly answered: ${newlyAnswered}`);
-        console.log(`- Total answered: ${answeredAfter}`);
-        console.log(`- Answer completion rate: ${((answeredAfter / totalQuestions) * 100).toFixed(2)}%`);
+        Logger.info(`\nAnswer Generation Summary:`);
+        Logger.info(`- Previously answered: ${answeredBefore}`);
+        Logger.info(`- Newly answered: ${newlyAnswered}`);
+        Logger.info(`- Total answered: ${answeredAfter}`);
+        Logger.info(`- Answer completion rate: ${((answeredAfter / totalQuestions) * 100).toFixed(2)}%`);
       } else {
-        console.log('\nAll questions are already answered, no need for answer generation.');
+        Logger.info('\nAll questions are already answered, no need for answer generation.');
       }
     }
 
     // Final summary for 'all' mode
     if (options.mode === 'all') {
       const { questionFile, qaFile } = getRegionFileNames(region.pinyin);
-      console.log('\n=== Final Status ===');
+      Logger.info('\n=== Final Status ===');
       try {
         const finalQuestions = JSON.parse(readFileSync(questionFile, 'utf-8')) as Question[];
         const finalAnswers = JSON.parse(readFileSync(qaFile, 'utf-8')) as QAItem[];
         
-        console.log(`Questions:`);
-        console.log(`- Total in file: ${finalQuestions.length}`);
-        console.log(`- Target count: ${options.totalCount}`);
-        console.log(`- Completion rate: ${((finalQuestions.length / options.totalCount) * 100).toFixed(2)}%`);
+        Logger.info(`Questions:`);
+        Logger.info(`- Total in file: ${finalQuestions.length}`);
+        Logger.info(`- Target count: ${options.totalCount}`);
+        Logger.info(`- Completion rate: ${((finalQuestions.length / options.totalCount) * 100).toFixed(2)}%`);
         
-        console.log(`\nAnswers:`);
-        console.log(`- Total answers: ${finalAnswers.length}`);
-        console.log(`- Answer rate: ${((finalAnswers.length / finalQuestions.length) * 100).toFixed(2)}%`);
+        Logger.info(`\nAnswers:`);
+        Logger.info(`- Total answers: ${finalAnswers.length}`);
+        Logger.info(`- Answer rate: ${((finalAnswers.length / finalQuestions.length) * 100).toFixed(2)}%`);
       } catch (error) {
-        console.error('Error reading final status:', error);
+        Logger.error('Error reading final status', error);
       }
     }
     
   } catch (error) {
-    console.error('Error executing requested mode:', error);
+    Logger.error('Error executing requested mode', error);
     process.exit(1);
   }
 }
