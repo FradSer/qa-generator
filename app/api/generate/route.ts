@@ -2,11 +2,11 @@ import { spawn } from 'child_process';
 
 export async function POST(request: Request) {
   const encoder = new TextEncoder();
+  const options = await request.json();
+  
   const customReadable = new ReadableStream({
     async start(controller) {
       try {
-        const options = await request.json();
-        
         // Construct command arguments
         const args = [
           'run',
@@ -30,29 +30,56 @@ export async function POST(request: Request) {
 
         // Handle process events
         process.stdout.on('data', (data) => {
-          const message = data.toString();
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', message })}\n\n`));
+          try {
+            const message = data.toString();
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', message })}\n\n`));
+          } catch (error) {
+            // Ignore enqueue errors if the stream is already closed
+          }
         });
 
         process.stderr.on('data', (data) => {
-          const message = data.toString();
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message })}\n\n`));
+          try {
+            const message = data.toString();
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message })}\n\n`));
+          } catch (error) {
+            // Ignore enqueue errors if the stream is already closed
+          }
         });
 
         process.on('close', (code) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end', code })}\n\n`));
-          controller.close();
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end', code })}\n\n`));
+            controller.close();
+          } catch (error) {
+            // Ignore enqueue errors if the stream is already closed
+          }
         });
 
         process.on('error', (error: Error) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`));
-          controller.close();
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`));
+            controller.close();
+          } catch (err) {
+            // Ignore enqueue errors if the stream is already closed
+          }
         });
-
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error occurred';
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message })}\n\n`));
-        controller.close();
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Failed to start generation process' })}\n\n`));
+          controller.close();
+        } catch (err) {
+          // Ignore enqueue errors if the stream is already closed
+        }
+      }
+    },
+    cancel(controller) {
+      // Handle stream cancellation
+      try {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', message: 'Stream cancelled by client' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end', code: -1 })}\n\n`));
+      } catch (error) {
+        // Ignore enqueue errors if the stream is already closed
       }
     }
   });
