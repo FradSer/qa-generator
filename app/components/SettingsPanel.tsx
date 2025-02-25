@@ -1,17 +1,17 @@
 'use client';
 
 import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Divider,
-  Input,
-  Radio,
-  RadioGroup,
-  ScrollShadow,
-  Select,
-  SelectItem
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    Divider,
+    Input,
+    Radio,
+    RadioGroup,
+    ScrollShadow,
+    Select,
+    SelectItem
 } from '@heroui/react';
 import { Dispatch, SetStateAction } from 'react';
 import { Region, regions } from '../../config/config';
@@ -53,7 +53,7 @@ export function SettingsPanel({
       <Card className="h-full rounded-2xl border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm">
         <CardHeader className="px-6 py-5 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
-            <i className="ri-settings-3-line text-blue-600"></i>
+            <i className="ri-settings-4-line text-blue-600"></i>
             Generation Settings
           </h2>
         </CardHeader>
@@ -63,7 +63,7 @@ export function SettingsPanel({
               {/* Operation Mode */}
               <div className="space-y-3 bg-slate-50/80 p-5 rounded-xl shadow-sm border border-slate-100">
                 <label id="mode-label" className="text-sm font-semibold text-slate-600 flex items-center gap-2.5">
-                  <i className="ri-list-settings-line text-blue-600"></i>
+                  <i className="ri-list-check-2 text-blue-600"></i>
                   Operation Mode
                 </label>
                 <RadioGroup
@@ -115,7 +115,7 @@ export function SettingsPanel({
               <div className="space-y-3 bg-slate-50/80 p-5 rounded-xl shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-semibold text-slate-600 flex items-center gap-2.5">
-                    <i className="ri-earth-line text-blue-600"></i>
+                    <i className="ri-map-pin-2-line text-blue-600"></i>
                     Region Selection
                   </label>
                   <Button
@@ -126,7 +126,7 @@ export function SettingsPanel({
                     className="bg-blue-50 text-blue-600 hover:bg-blue-100"
                   >
                     <span className="flex items-center gap-1.5">
-                      <i className="ri-add-line"></i>
+                      <i className="ri-add-circle-line"></i>
                       Add New
                     </span>
                   </Button>
@@ -171,7 +171,7 @@ export function SettingsPanel({
                   variant="bordered"
                   labelPlacement="outside"
                   startContent={
-                    <i className="ri-questionnaire-line"></i>
+                    <i className="ri-question-line"></i>
                   }
                   className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
                   classNames={{
@@ -191,7 +191,7 @@ export function SettingsPanel({
                   variant="bordered"
                   labelPlacement="outside"
                   startContent={
-                    <i className="ri-group-line"></i>
+                    <i className="ri-team-line"></i>
                   }
                   className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
                   classNames={{
@@ -231,7 +231,7 @@ export function SettingsPanel({
                   variant="bordered"
                   labelPlacement="outside"
                   startContent={
-                    <i className="ri-repeat-line"></i>
+                    <i className="ri-refresh-line"></i>
                   }
                   className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
                   classNames={{
@@ -271,7 +271,7 @@ export function SettingsPanel({
                   variant="bordered"
                   labelPlacement="outside"
                   startContent={
-                    <i className="ri-timer-line"></i>
+                    <i className="ri-time-line"></i>
                   }
                   className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
                   classNames={{
@@ -298,12 +298,12 @@ export function SettingsPanel({
                 <span className="flex items-center justify-center gap-2">
                   {isRunning ? (
                     <>
-                      <i className="ri-stop-circle-line"></i>
+                      <i className="ri-stop-circle-fill"></i>
                       Stop Generation
                     </>
                   ) : (
                     <>
-                      <i className="ri-play-circle-line"></i>
+                      <i className="ri-play-circle-fill"></i>
                       Start Generation
                     </>
                   )}

@@ -1,10 +1,10 @@
 'use client';
 
 import {
-  Card,
-  CardBody,
-  CardHeader,
-  ScrollShadow
+    Card,
+    CardBody,
+    CardHeader,
+    ScrollShadow
 } from '@heroui/react';
 import { RefObject } from 'react';
 
@@ -22,7 +22,7 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
       <Card className="h-full rounded-2xl card-glass overflow-hidden border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm">
         <CardHeader className="px-6 py-5 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
-            <i className="ri-terminal-line text-blue-600"></i>
+            <i className="ri-terminal-box-line text-blue-600"></i>
             Execution Logs
           </h2>
         </CardHeader>
@@ -55,23 +55,23 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
                     bgColor = 'bg-red-900/20 hover:bg-red-900/30';
                     borderColor = 'border-red-700/30';
                     icon = (
-                      <i className="ri-error-warning-line text-red-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-error-warning-fill text-red-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else if (isSuccess) {
                     bgColor = 'bg-green-900/20 hover:bg-green-900/30';
                     borderColor = 'border-green-700/30';
                     icon = (
-                      <i className="ri-checkbox-circle-line text-green-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-checkbox-circle-fill text-green-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else if (isWarning) {
                     bgColor = 'bg-yellow-900/20 hover:bg-yellow-900/30';
                     borderColor = 'border-yellow-700/30';
                     icon = (
-                      <i className="ri-alert-line text-yellow-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-alert-fill text-yellow-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else {
                     icon = (
-                      <i className="ri-flashlight-line text-blue-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-message-2-line text-blue-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   }
                   

@@ -1,10 +1,10 @@
 'use client';
 
 import {
-  Badge,
-  Navbar,
-  NavbarBrand,
-  NavbarContent
+    Badge,
+    Navbar,
+    NavbarBrand,
+    NavbarContent
 } from '@heroui/react';
 
 type NavbarProps = {
@@ -25,7 +25,7 @@ export function NavbarComponent({ title, isRunning }: NavbarProps) {
       <NavbarContent className="px-6 py-3">
         <NavbarBrand className="flex items-center gap-4">
           <div className="flex items-center">
-            <i className="ri-flashlight-line text-blue-500 text-2xl mr-3"></i>
+            <i className="ri-dashboard-3-line text-blue-500 text-2xl mr-3"></i>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
               {title}
             </h1>
