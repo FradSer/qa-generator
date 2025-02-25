@@ -1,8 +1,12 @@
+import { HeroUIProvider } from '@heroui/react';
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const outfit = Outfit({ 
+  subsets: ["latin"],
+  variable: '--font-outfit',
+});
 
 export const metadata: Metadata = {
   title: "QA Generator Control Panel",
@@ -16,7 +20,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={`${outfit.variable} font-outfit h-screen overflow-hidden`}>
+        <HeroUIProvider>
+          {children}
+        </HeroUIProvider>
+      </body>
     </html>
   );
 } 
