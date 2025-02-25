@@ -1,6 +1,7 @@
 import { HeroUIProvider } from '@heroui/react';
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
+import 'remixicon/fonts/remixicon.css';
 import "./globals.css";
 
 const outfit = Outfit({ 

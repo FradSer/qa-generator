@@ -25,9 +25,7 @@ export function NavbarComponent({ title, isRunning }: NavbarProps) {
       <NavbarContent className="px-6 py-3">
         <NavbarBrand className="flex items-center gap-4">
           <div className="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-blue-500 mr-3">
-              <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z" clipRule="evenodd" />
-            </svg>
+            <i className="ri-flashlight-line text-blue-500 text-2xl mr-3"></i>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
               {title}
             </h1>
