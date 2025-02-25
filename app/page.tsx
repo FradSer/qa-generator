@@ -174,10 +174,12 @@ export default function ControlPanel() {
   };
 
   return (
-    <main className="h-screen w-full overflow-hidden">
+    <main className="h-screen w-full overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="absolute inset-0 bg-grid-slate-200/60 bg-[length:20px_20px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#fff,transparent)]"></div>
+      
       <NavbarComponent title="QA Generator Control Panel" isRunning={isRunning} />
       
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] mt-16 px-4 md:px-6 lg:px-10 py-4 gap-6">
+      <div className="relative flex flex-col lg:flex-row h-[calc(100vh-64px)] mt-16 px-4 md:px-6 lg:px-10 py-6 gap-8">
         <SettingsPanel 
           options={options}
           setOptions={setOptions}
