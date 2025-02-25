@@ -44,10 +44,10 @@ export function AddRegionModal({
       onClose={onClose}
       size="lg"
       classNames={{
-        base: "rounded-2xl shadow-2xl border border-white/50",
+        base: "rounded-2xl shadow-xl border border-white/60",
         body: "py-6",
-        wrapper: "backdrop-blur-md bg-slate-900/20",
-        closeButton: "hover:bg-slate-200/70 transition-colors"
+        wrapper: "backdrop-blur-md bg-slate-900/10",
+        closeButton: "hover:bg-slate-100 transition-colors"
       }}
       backdrop="blur"
       motionProps={{
@@ -74,9 +74,9 @@ export function AddRegionModal({
     >
       <ModalContent>
         <form onSubmit={handleSubmit}>
-          <ModalHeader className="px-8 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <i className="ri-add-circle-line text-blue-500"></i>
+          <ModalHeader className="px-8 py-5 border-b border-slate-100">
+            <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
+              <i className="ri-add-circle-line text-blue-600"></i>
               Add New Region
             </h3>
           </ModalHeader>
@@ -90,12 +90,12 @@ export function AddRegionModal({
               variant="bordered"
               labelPlacement="outside"
               startContent={
-                <i className="ri-map-pin-line text-blue-500 flex-shrink-0"></i>
+                <i className="ri-map-pin-line text-blue-600 flex-shrink-0"></i>
               }
               className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
               classNames={{
                 inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100",
-                label: "text-slate-700 font-medium text-sm flex items-center gap-2",
+                label: "text-slate-600 font-medium text-sm flex items-center gap-2.5",
                 input: "text-slate-700"
               }}
             />
@@ -137,27 +137,21 @@ export function AddRegionModal({
               }}
             />
           </ModalBody>
-          <ModalFooter className="px-8 py-5 border-t border-slate-100 flex gap-3 justify-end">
-            <Button
-              variant="flat"
+          <ModalFooter className="px-8 py-5 border-t border-slate-100 bg-slate-50/50">
+            <Button 
+              color="danger" 
+              variant="flat" 
               onPress={onClose}
-              className="font-medium bg-slate-100 hover:bg-slate-200 transition-all duration-300 shadow-sm hover:shadow px-4"
-              type="button"
+              className="font-medium min-w-[100px] bg-red-50 text-red-600 hover:bg-red-100"
             >
-              <span className="flex items-center gap-1.5">
-                <i className="ri-close-circle-line"></i>
-                Cancel
-              </span>
+              Cancel
             </Button>
             <Button 
               color="primary" 
               type="submit"
-              className="font-medium bg-gradient-to-r from-blue-500 to-blue-600 shadow-md hover:shadow-lg hover:translate-y-[-1px] transition-all duration-300 px-4"
+              className="font-medium min-w-[100px] bg-blue-600 text-white hover:bg-blue-700"
             >
-              <span className="flex items-center gap-1.5">
-                <i className="ri-add-circle-line"></i>
-                Add Region
-              </span>
+              Add Region
             </Button>
           </ModalFooter>
         </form>

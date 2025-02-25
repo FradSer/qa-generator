@@ -20,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${outfit.variable} font-outfit h-screen overflow-hidden`}>
+    <html lang="en" className="h-full">
+      <body className={`${outfit.variable} font-outfit h-full overflow-hidden text-slate-700`}>
         <HeroUIProvider>
           {children}
         </HeroUIProvider>

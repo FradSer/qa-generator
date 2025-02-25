@@ -19,16 +19,16 @@ type LogsPanelProps = {
 export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
   return (
     <div className="flex-1 w-full animate-in fade-in duration-500">
-      <Card className="h-full rounded-2xl card-glass overflow-hidden border border-slate-200/60 shadow-lg bg-white/90 backdrop-blur-sm">
-        <CardHeader className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <i className="ri-edit-line text-blue-500"></i>
+      <Card className="h-full rounded-2xl card-glass overflow-hidden border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm">
+        <CardHeader className="px-6 py-5 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
+            <i className="ri-terminal-line text-blue-600"></i>
             Execution Logs
           </h2>
         </CardHeader>
-        <CardBody className="p-0">
+        <CardBody className="p-6 lg:flex-1 lg:overflow-hidden">
           <ScrollShadow 
-            className="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 h-[calc(100vh-200px)] overflow-y-auto font-mono text-sm"
+            className="bg-gradient-to-r from-slate-900 to-slate-800 text-slate-100 h-full max-h-[400px] lg:max-h-full overflow-y-auto font-mono text-sm rounded-lg"
             role="log"
             aria-live="polite"
             aria-label="Execution logs"
@@ -40,7 +40,7 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
                 <span className="italic">No logs yet. Start generation to see logs here.</span>
               </div>
             ) : (
-              <div className="p-6 space-y-2">
+              <div className="p-5 space-y-2.5">
                 {logs.map((log, index) => {
                   // 根据日志内容设置不同的样式
                   const isError = log.toLowerCase().includes('error');
@@ -52,37 +52,37 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
                   let icon = null;
                   
                   if (isError) {
-                    bgColor = 'bg-red-900/20 hover:bg-red-900/40';
+                    bgColor = 'bg-red-900/20 hover:bg-red-900/30';
                     borderColor = 'border-red-700/30';
                     icon = (
-                      <i className="ri-error-warning-line text-red-400 mt-1 text-base flex-shrink-0"></i>
+                      <i className="ri-error-warning-line text-red-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else if (isSuccess) {
-                    bgColor = 'bg-green-900/20 hover:bg-green-900/40';
+                    bgColor = 'bg-green-900/20 hover:bg-green-900/30';
                     borderColor = 'border-green-700/30';
                     icon = (
-                      <i className="ri-checkbox-circle-line text-green-400 mt-1 text-base flex-shrink-0"></i>
+                      <i className="ri-checkbox-circle-line text-green-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else if (isWarning) {
-                    bgColor = 'bg-yellow-900/20 hover:bg-yellow-900/40';
+                    bgColor = 'bg-yellow-900/20 hover:bg-yellow-900/30';
                     borderColor = 'border-yellow-700/30';
                     icon = (
-                      <i className="ri-alert-line text-yellow-400 mt-1 text-base flex-shrink-0"></i>
+                      <i className="ri-alert-line text-yellow-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else {
                     icon = (
-                      <i className="ri-flashlight-line text-blue-400 mt-1 text-base flex-shrink-0"></i>
+                      <i className="ri-flashlight-line text-blue-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   }
                   
                   return (
                     <div 
                       key={index} 
-                      className={`rounded-md px-4 py-3 ${bgColor} border ${borderColor} shadow-sm whitespace-pre-wrap transition-colors duration-300 group`}
+                      className={`rounded-md px-4 py-2.5 ${bgColor} border ${borderColor} shadow-md whitespace-pre-wrap transition-colors duration-200 group`}
                     >
                       <div className="flex">
-                        <div className="mr-2 mt-1">{icon}</div>
-                        <div className="flex-1 opacity-90 group-hover:opacity-100">{log}</div>
+                        <div className="mr-3 mt-0.5">{icon}</div>
+                        <div className="flex-1 opacity-95 group-hover:opacity-100">{log}</div>
                       </div>
                     </div>
                   );

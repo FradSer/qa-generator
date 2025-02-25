@@ -49,21 +49,21 @@ export function SettingsPanel({
   onAddRegionClick
 }: SettingsPanelProps) {
   return (
-    <div className="w-full lg:w-[480px] lg:min-w-[480px] flex-shrink-0 animate-in fade-in duration-500">
-      <Card className="h-full rounded-2xl border border-slate-200/60 shadow-lg bg-white/90 backdrop-blur-sm">
-        <CardHeader className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <i className="ri-settings-3-line text-blue-500"></i>
+    <div className="w-full lg:w-[480px] lg:min-w-[480px] flex-shrink-0 animate-in fade-in duration-500 mb-6 lg:mb-0">
+      <Card className="h-full rounded-2xl border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm">
+        <CardHeader className="px-6 py-5 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
+            <i className="ri-settings-3-line text-blue-600"></i>
             Generation Settings
           </h2>
         </CardHeader>
-        <CardBody className="p-0">
-          <ScrollShadow className="h-[calc(100vh-200px)] px-6 pb-6">
-            <form onSubmit={handleSubmit} className="space-y-7 py-5">
+        <CardBody className="p-6 lg:flex-1 lg:overflow-hidden">
+          <ScrollShadow className="h-full max-h-[600px] lg:max-h-full">
+            <form onSubmit={handleSubmit} className="space-y-7 py-5 px-6">
               {/* Operation Mode */}
-              <div className="space-y-3 bg-gradient-to-br from-slate-50 to-white p-5 rounded-xl shadow-sm border border-slate-100">
-                <label id="mode-label" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <i className="ri-list-settings-line text-blue-500"></i>
+              <div className="space-y-3 bg-slate-50/80 p-5 rounded-xl shadow-sm border border-slate-100">
+                <label id="mode-label" className="text-sm font-semibold text-slate-600 flex items-center gap-2.5">
+                  <i className="ri-list-settings-line text-blue-600"></i>
                   Operation Mode
                 </label>
                 <RadioGroup
@@ -80,8 +80,8 @@ export function SettingsPanel({
                     className="hover:scale-105 transition-all duration-300"
                     classNames={{
                       base: "border-blue-200 data-[selected=true]:border-blue-500",
-                      label: "text-slate-700 font-medium",
-                      control: "data-[selected=true]:bg-blue-500 data-[selected=true]:text-white"
+                      label: "text-slate-600 font-medium",
+                      control: "data-[selected=true]:bg-blue-600 data-[selected=true]:text-white"
                     }}
                   >
                     Questions
@@ -91,8 +91,8 @@ export function SettingsPanel({
                     className="hover:scale-105 transition-all duration-300"
                     classNames={{
                       base: "border-blue-200 data-[selected=true]:border-blue-500",
-                      label: "text-slate-700 font-medium",
-                      control: "data-[selected=true]:bg-blue-500 data-[selected=true]:text-white"
+                      label: "text-slate-600 font-medium",
+                      control: "data-[selected=true]:bg-blue-600 data-[selected=true]:text-white"
                     }}
                   >
                     Answers
@@ -102,8 +102,8 @@ export function SettingsPanel({
                     className="hover:scale-105 transition-all duration-300"
                     classNames={{
                       base: "border-blue-200 data-[selected=true]:border-blue-500",
-                      label: "text-slate-700 font-medium",
-                      control: "data-[selected=true]:bg-blue-500 data-[selected=true]:text-white"
+                      label: "text-slate-600 font-medium",
+                      control: "data-[selected=true]:bg-blue-600 data-[selected=true]:text-white"
                     }}
                   >
                     All
@@ -112,10 +112,10 @@ export function SettingsPanel({
               </div>
 
               {/* Region Selection */}
-              <div className="space-y-3 bg-gradient-to-br from-slate-50 to-white p-5 rounded-xl shadow-sm border border-slate-100">
+              <div className="space-y-3 bg-slate-50/80 p-5 rounded-xl shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <i className="ri-earth-line"></i>
+                  <label className="text-sm font-semibold text-slate-600 flex items-center gap-2.5">
+                    <i className="ri-earth-line text-blue-600"></i>
                     Region Selection
                   </label>
                   <Button
@@ -123,8 +123,9 @@ export function SettingsPanel({
                     variant="flat"
                     color="primary"
                     onPress={onAddRegionClick}
+                    className="bg-blue-50 text-blue-600 hover:bg-blue-100"
                   >
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <i className="ri-add-line"></i>
                       Add New
                     </span>

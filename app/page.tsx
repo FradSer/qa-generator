@@ -174,27 +174,34 @@ export default function ControlPanel() {
   };
 
   return (
-    <main className="h-screen w-full overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="absolute inset-0 bg-grid-slate-200/60 bg-[length:20px_20px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#fff,transparent)]"></div>
+    <main className="h-screen overflow-auto bg-slate-50">
+      {/* Subtle grid background */}
+      <div className="absolute inset-0 bg-grid-slate-200/60 [mask-image:radial-gradient(ellipse_90%_90%_at_50%_50%,#fff,transparent)]"></div>
       
+      {/* Navigation Bar */}
       <NavbarComponent title="QA Generator Control Panel" isRunning={isRunning} />
       
-      <div className="relative flex flex-col lg:flex-row h-[calc(100vh-64px)] mt-16 px-4 md:px-6 lg:px-10 py-6 gap-8">
-        <SettingsPanel 
-          options={options}
-          setOptions={setOptions}
-          isRunning={isRunning}
-          handleSubmit={handleSubmit}
-          handleStop={handleStop}
-          onAddRegionClick={() => setShowAddRegion(true)}
-        />
-
-        <LogsPanel
-          logs={logs}
-          logsEndRef={logsEndRef}
-        />
+      {/* Main Content */}
+      <div className="relative mt-[72px] min-h-[calc(100vh-72px)]">
+        <div className="px-6 pb-6 lg:h-full lg:overflow-hidden">
+          <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
+            {/* Settings Panel */}
+            <SettingsPanel
+              options={options}
+              setOptions={setOptions}
+              isRunning={isRunning}
+              handleSubmit={handleSubmit}
+              handleStop={handleStop}
+              onAddRegionClick={() => setShowAddRegion(true)}
+            />
+            
+            {/* Logs Panel */}
+            <LogsPanel logs={logs} logsEndRef={logsEndRef} />
+          </div>
+        </div>
       </div>
-
+      
+      {/* Add Region Modal */}
       <AddRegionModal
         isOpen={showAddRegion}
         onClose={() => {
