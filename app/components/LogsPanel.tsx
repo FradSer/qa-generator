@@ -35,7 +35,7 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
             <div className="space-y-2 p-4">
               {logs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full p-6 text-slate-400">
-                  <i className="ri-terminal-line text-slate-500/50 text-4xl mb-3"></i>
+                  <i className="ri-terminal-line text-slate-500/50 text-4xl mb-2"></i>
                   <span className="italic">No logs yet. Start generation to see logs here.</span>
                 </div>
               ) : (
@@ -67,9 +67,9 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
                       key={index}
                       className={`p-3 rounded-lg border ${borderColor} ${bgColor} transition-colors duration-300`}
                     >
-                      <div className="flex items-start gap-2">
-                        {icon && <span className="mt-0.5">{icon}</span>}
-                        <span className="flex-1">{log}</span>
+                      <div className="flex items-center gap-2">
+                        {icon && <span className="flex-shrink-0 leading-none">{icon}</span>}
+                        <span className="flex-1 leading-normal">{log}</span>
                       </div>
                     </div>
                   );

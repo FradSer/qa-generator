@@ -139,7 +139,7 @@ export function SettingsPanel({
                   }}
                   className="w-full"
                   startContent={
-                    <i className="ri-map-pin-line text-blue-500 flex-shrink-0"></i>
+                    <i className="ri-map-pin-line text-blue-500 flex-shrink-0 leading-tight"></i>
                   }
                   placeholder="Select a region"
                 >
@@ -151,12 +151,12 @@ export function SettingsPanel({
                     >
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <i className="ri-map-pin-2-line text-slate-400 group-data-[selected=true]:text-blue-500"></i>
-                          <span className="font-medium text-slate-700 group-data-[selected=true]:text-blue-600">{region.name}</span>
-                          <span className="text-sm text-slate-500">({region.pinyin})</span>
+                          <i className="ri-map-pin-2-line text-slate-400 group-data-[selected=true]:text-blue-500 leading-tight"></i>
+                          <span className="font-medium text-slate-700 group-data-[selected=true]:text-blue-600 leading-normal">{region.name}</span>
+                          <span className="text-sm text-slate-500 leading-normal">({region.pinyin})</span>
                         </div>
                         {region.description && (
-                          <div className="text-sm text-slate-500 group-data-[selected=true]:text-blue-500/80 pl-6">
+                          <div className="text-sm text-slate-500 group-data-[selected=true]:text-blue-500/80 pl-6 leading-tight">
                             {region.description}
                           </div>
                         )}
@@ -182,7 +182,7 @@ export function SettingsPanel({
                     min={1}
                     className="w-full"
                     startContent={
-                      <i className="ri-numbers-line text-blue-500 flex-shrink-0"></i>
+                      <i className="ri-numbers-line text-blue-500 flex-shrink-0 leading-tight"></i>
                     }
                   />
                   <Input
@@ -193,7 +193,7 @@ export function SettingsPanel({
                     min={1}
                     className="w-full"
                     startContent={
-                      <i className="ri-robot-line text-blue-500 flex-shrink-0"></i>
+                      <i className="ri-robot-line text-blue-500 flex-shrink-0 leading-tight"></i>
                     }
                   />
                   <Input
@@ -204,7 +204,7 @@ export function SettingsPanel({
                     min={1}
                     className="w-full"
                     startContent={
-                      <i className="ri-stack-line text-blue-500 flex-shrink-0"></i>
+                      <i className="ri-stack-line text-blue-500 flex-shrink-0 leading-tight"></i>
                     }
                   />
                   <Input
@@ -215,7 +215,7 @@ export function SettingsPanel({
                     min={1}
                     className="w-full"
                     startContent={
-                      <i className="ri-restart-line text-blue-500 flex-shrink-0"></i>
+                      <i className="ri-restart-line text-blue-500 flex-shrink-0 leading-tight"></i>
                     }
                   />
                   <Input
@@ -226,7 +226,7 @@ export function SettingsPanel({
                     min={1}
                     className="w-full"
                     startContent={
-                      <i className="ri-folder-line text-blue-500 flex-shrink-0"></i>
+                      <i className="ri-folder-line text-blue-500 flex-shrink-0 leading-tight"></i>
                     }
                   />
                   <Input
@@ -237,7 +237,7 @@ export function SettingsPanel({
                     min={0}
                     className="w-full"
                     startContent={
-                      <i className="ri-time-line text-blue-500 flex-shrink-0"></i>
+                      <i className="ri-time-line text-blue-500 flex-shrink-0 leading-tight"></i>
                     }
                   />
                 </div>

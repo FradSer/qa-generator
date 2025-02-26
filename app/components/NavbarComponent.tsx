@@ -1,10 +1,10 @@
 'use client';
 
 import {
-    Badge,
-    Navbar,
-    NavbarBrand,
-    NavbarContent
+  Badge,
+  Navbar,
+  NavbarBrand,
+  NavbarContent
 } from '@heroui/react';
 
 type NavbarProps = {
@@ -24,9 +24,9 @@ export function NavbarComponent({ title, isRunning }: NavbarProps) {
     >
       <NavbarContent className="px-6 py-3">
         <NavbarBrand className="flex items-center gap-4">
-          <div className="flex items-center">
-            <i className="ri-dashboard-3-line text-blue-600 text-2xl mr-3 transition-transform duration-300 hover:scale-110"></i>
-            <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-200 tracking-tight">
+          <div className="flex items-center gap-3">
+            <i className="ri-dashboard-3-line text-blue-600 text-2xl leading-none"></i>
+            <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-200 tracking-tight leading-none">
               {title}
             </h1>
           </div>
@@ -42,12 +42,12 @@ export function NavbarComponent({ title, isRunning }: NavbarProps) {
             aria-live="polite"
           >
             <div className="flex items-center gap-1.5 px-0.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                 isRunning 
                   ? 'bg-white animate-ping' 
                   : 'bg-green-500'
               }`}></div>
-              <span className="text-sm">{isRunning ? 'Running' : 'Idle'}</span>
+              <span className="text-sm leading-none">{isRunning ? 'Running' : 'Idle'}</span>
             </div>
           </Badge>
         </NavbarBrand>
