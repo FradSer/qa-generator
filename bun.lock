@@ -5,7 +5,6 @@
       "name": "groq-qa",
       "dependencies": {
         "@baiducloud/qianfan": "^0.2.2",
-        "@heroicons/react": "^2.2.0",
         "@heroui/badge": "^2.2.9",
         "@heroui/button": "^2.2.13",
         "@heroui/card": "^2.2.13",
@@ -113,8 +112,6 @@
     "@formatjs/icu-skeleton-parser": ["@formatjs/icu-skeleton-parser@1.8.13", "", { "dependencies": { "@formatjs/ecma402-abstract": "2.3.3", "tslib": "2" } }, "sha512-N/LIdTvVc1TpJmMt2jVg0Fr1F7Q1qJPdZSCs19unMskCmVQ/sa0H9L8PWt13vq+gLdLg1+pPsvBLydL1Apahjg=="],
 
     "@formatjs/intl-localematcher": ["@formatjs/intl-localematcher@0.6.0", "", { "dependencies": { "tslib": "2" } }, "sha512-4rB4g+3hESy1bHSBG3tDFaMY2CH67iT7yne1e+0CLTsGLDcmoEWWpJjjpWVaYgYfYuohIRuo0E+N536gd2ZHZA=="],
-
-    "@heroicons/react": ["@heroicons/react@2.2.0", "", { "peerDependencies": { "react": ">= 16 || ^19.0.0-rc" } }, "sha512-LMcepvRaS9LYHJGsF0zzmgKCUim/X3N/DQKc4jepAXJ7l8QxJ1PmxJzqplF2Z3FE4PqBAIGyJAQ/w4B5dsqbtQ=="],
 
     "@heroui/accordion": ["@heroui/accordion@2.2.11", "", { "dependencies": { "@heroui/aria-utils": "2.2.11", "@heroui/divider": "2.2.9", "@heroui/dom-animation": "2.1.5", "@heroui/framer-utils": "2.1.10", "@heroui/react-utils": "2.1.7", "@heroui/shared-icons": "2.1.5", "@heroui/shared-utils": "2.1.6", "@heroui/use-aria-accordion": "2.2.6", "@react-aria/button": "3.11.1", "@react-aria/focus": "3.19.1", "@react-aria/interactions": "3.23.0", "@react-aria/utils": "3.27.0", "@react-stately/tree": "3.8.7", "@react-types/accordion": "3.0.0-alpha.26", "@react-types/shared": "3.27.0" }, "peerDependencies": { "@heroui/system": ">=2.4.7", "@heroui/theme": ">=2.4.6", "framer-motion": ">=11.5.6 || >=12.0.0-alpha.1", "react": ">=18 || >=19.0.0-rc.0", "react-dom": ">=18 || >=19.0.0-rc.0" } }, "sha512-XQRl+eXqJgfx6OFe7QPCvepKOvy5DFfZ8XUmVuc9ptvxAyifgYhT276ro+xJyQSypRzLDpLFnweuZuBg4Vwu+Q=="],
 

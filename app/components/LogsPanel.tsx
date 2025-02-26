@@ -1,10 +1,10 @@
 'use client';
 
 import {
-    Card,
-    CardBody,
-    CardHeader,
-    ScrollShadow
+  Card,
+  CardBody,
+  CardHeader,
+  ScrollShadow
 } from '@heroui/react';
 import { RefObject } from 'react';
 
@@ -18,11 +18,11 @@ type LogsPanelProps = {
  */
 export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
   return (
-    <div className="flex-1 w-full animate-in fade-in duration-500">
-      <Card className="h-full rounded-2xl card-glass overflow-hidden border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm">
+    <div className="flex-1 w-full animate-in slide-in-from-right-5 duration-700 ease-out">
+      <Card className="h-full rounded-2xl card-glass overflow-hidden border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:border-slate-300/70">
         <CardHeader className="px-6 py-5 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
-            <i className="ri-terminal-box-line text-blue-600"></i>
+            <i className="ri-terminal-line text-blue-600"></i>
             Execution Logs
           </h2>
         </CardHeader>
@@ -36,7 +36,7 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
           >
             {logs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-6 text-slate-400">
-                <i className="ri-terminal-box-line text-slate-500/50 text-4xl mb-3"></i>
+                <i className="ri-terminal-line text-slate-500/50 text-4xl mb-3"></i>
                 <span className="italic">No logs yet. Start generation to see logs here.</span>
               </div>
             ) : (
@@ -47,7 +47,7 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
                   const isSuccess = log.toLowerCase().includes('complet') || log.toLowerCase().includes('success');
                   const isWarning = log.toLowerCase().includes('warning') || log.toLowerCase().includes('stopping');
                   
-                  let bgColor = 'hover:bg-slate-700/60';
+                  let bgColor = 'hover:bg-blue-100/10';
                   let borderColor = 'border-slate-700/50';
                   let icon = null;
                   
@@ -55,34 +55,34 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
                     bgColor = 'bg-red-900/20 hover:bg-red-900/30';
                     borderColor = 'border-red-700/30';
                     icon = (
-                      <i className="ri-error-warning-fill text-red-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-error-warning-line text-red-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else if (isSuccess) {
                     bgColor = 'bg-green-900/20 hover:bg-green-900/30';
                     borderColor = 'border-green-700/30';
                     icon = (
-                      <i className="ri-checkbox-circle-fill text-green-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-checkbox-circle-line text-green-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else if (isWarning) {
                     bgColor = 'bg-yellow-900/20 hover:bg-yellow-900/30';
                     borderColor = 'border-yellow-700/30';
                     icon = (
-                      <i className="ri-alert-fill text-yellow-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-alert-line text-yellow-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   } else {
                     icon = (
-                      <i className="ri-message-2-line text-blue-400 mt-0.5 text-base flex-shrink-0"></i>
+                      <i className="ri-chat-1-line text-blue-400 mt-0.5 text-base flex-shrink-0"></i>
                     );
                   }
                   
                   return (
                     <div 
                       key={index} 
-                      className={`rounded-md px-4 py-2.5 ${bgColor} border ${borderColor} shadow-md whitespace-pre-wrap transition-colors duration-200 group`}
+                      className={`rounded-md px-4 py-2.5 ${bgColor} border ${borderColor} shadow-md whitespace-pre-wrap transition-all duration-200 ease-out hover:translate-x-1 group`}
                     >
                       <div className="flex">
-                        <div className="mr-3 mt-0.5">{icon}</div>
-                        <div className="flex-1 opacity-95 group-hover:opacity-100">{log}</div>
+                        <div className="mr-3 mt-0.5 transition-transform duration-200 group-hover:scale-110">{icon}</div>
+                        <div className="flex-1 opacity-95 transition-opacity duration-200 group-hover:opacity-100">{log}</div>
                       </div>
                     </div>
                   );

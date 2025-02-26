@@ -47,7 +47,7 @@ export function AddRegionModal({
         base: "rounded-2xl shadow-xl border border-white/60",
         body: "py-6",
         wrapper: "backdrop-blur-md bg-slate-900/10",
-        closeButton: "hover:bg-slate-100 transition-colors"
+        closeButton: "hover:bg-blue-50 transition-colors"
       }}
       backdrop="blur"
       motionProps={{
@@ -94,7 +94,7 @@ export function AddRegionModal({
               }
               className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
               classNames={{
-                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100",
+                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100",
                 label: "text-slate-600 font-medium text-sm flex items-center gap-2.5",
                 input: "text-slate-700"
               }}
@@ -112,7 +112,7 @@ export function AddRegionModal({
               }
               className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
               classNames={{
-                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100",
+                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100",
                 label: "text-slate-700 font-medium text-sm flex items-center gap-2",
                 input: "text-slate-700"
               }}
@@ -127,11 +127,11 @@ export function AddRegionModal({
               labelPlacement="outside"
               minRows={3}
               startContent={
-                <i className="ri-file-text-line text-blue-500 flex-shrink-0 mt-1.5"></i>
+                <i className="ri-file-text-line text-blue-500 flex-shrink-0"></i>
               }
               className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
               classNames={{
-                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 min-h-[120px]",
+                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 min-h-[120px]",
                 label: "text-slate-700 font-medium text-sm flex items-center gap-2",
                 input: "text-slate-700"
               }}
