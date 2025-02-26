@@ -25,7 +25,7 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
             Execution Logs
           </h2>
         </CardHeader>
-        <CardBody className="p-6 h-[600px] flex flex-col">
+        <CardBody className="p-6 h-[calc(100vh-180px)] flex flex-col">
           <div 
             className="bg-slate-900 text-slate-100 h-full overflow-y-auto font-mono text-sm rounded-xl scrollbar-none"
             role="log"

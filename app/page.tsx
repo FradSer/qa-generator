@@ -184,7 +184,7 @@ export default function ControlPanel() {
       {/* Main Content */}
       <div className="relative mt-[72px] min-h-[calc(100vh-72px)]">
         <div className="px-6 pb-6 lg:h-full lg:overflow-hidden">
-          <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
+          <div className="flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-96px)]">
             {/* Settings Panel */}
             <SettingsPanel
               options={options}
