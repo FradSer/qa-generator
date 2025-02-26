@@ -4,7 +4,7 @@
 
 [English](README.md) | 简体中文
 
-一款基于多种 AI 模型的智能问答生成工具，专注于为中国各地区生成高质量的本地特色问答内容。
+一款基于多种 AI 模型的智能问答生成工具，专注于为中国各地区生成高质量的本地特色问答内容。采用 Next.js 和 Tailwind CSS 构建现代化的 Web 界面。
 
 ## 主要特性
 
@@ -18,6 +18,7 @@
 - **灵活配置**：可自定义问题数量和重试次数
 - **多线程处理**：利用多线程并行处理，提升生成效率
 - **智能输出**：结构化的 JSON 输出，包含问题、答案和推理过程
+- **现代界面**：使用 Next.js 和 Tailwind CSS 构建美观、响应式的用户界面
 
 ## 运行环境
 
@@ -25,6 +26,7 @@
 - 已安装 [Bun](https://bun.sh) 运行环境
 - 有百度千帆 API 密钥（使用千帆模型时需要）
 - 有 Groq API 密钥（使用 Groq 模型时需要）
+- Node.js 18+ 版本（用于 Next.js 开发）
 
 ## 快速上手
 
@@ -79,6 +81,16 @@ bun run start [参数]
 - `--batch <数字>`：批处理大小（默认：50）
 - `--delay <数字>`：批次间延迟（毫秒）（默认：1000）
 - `--attempts <数字>`：每个任务的最大重试次数（默认：3）
+
+### Web 界面
+
+启动 Next.js 开发服务器：
+
+```bash
+bun run dev
+```
+
+访问 `http://localhost:3000` 即可使用 Web 界面。
 
 ### 工作线程系统
 
@@ -145,7 +157,7 @@ export const regions: Region[] = [
 
 ### 输出格式
 
-每个地区会生成两个 JSON 文件：
+每个地区会在 `data` 目录下生成两个 JSON 文件：
 
 1. 问题文件：`<地区>_q_results.json`
 ```json
@@ -172,17 +184,18 @@ export const regions: Region[] = [
 
 ```
 .
-├── config/            # 配置文件
-├── data/             # 生成数据存储
-├── generators/        # 问答生成器
-├── providers/        # AI 模型接入
-│   ├── groq/         # Groq 模型
-│   └── qianfan/      # 千帆模型
-├── prompts/          # AI 提示词模板
-├── types/            # TypeScript 类型定义
-├── utils/            # 工具函数
-├── workers/          # 多线程处理
-└── index.ts          # 主程序入口
+├── app/             # Next.js 应用文件
+├── config/          # 配置文件
+├── data/           # 生成的问答数据
+├── generators/      # 问答生成器
+├── providers/       # AI 模型接入
+│   ├── groq/        # Groq 模型
+│   └── qianfan/     # 千帆模型
+├── prompts/         # AI 提示词模板
+├── types/          # TypeScript 类型定义
+├── utils/          # 工具函数
+├── workers/        # 多线程处理
+└── index.ts        # 主程序入口
 ```
 
 ## 错误处理

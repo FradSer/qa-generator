@@ -4,7 +4,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A sophisticated TypeScript application that leverages multiple AI providers to generate high-quality questions and answers for various regions in China.
+A sophisticated TypeScript application that leverages multiple AI providers to generate high-quality questions and answers for various regions in China. Built with Next.js and Tailwind CSS for a modern web interface.
 
 ## Key Features
 
@@ -18,6 +18,7 @@ A sophisticated TypeScript application that leverages multiple AI providers to g
 - **Flexible Configuration**: Customizable question count and answer retry attempts
 - **Multi-threaded Processing**: Parallel processing with worker threads for improved performance
 - **Intelligent Output**: Structured JSON output with questions, answers, and reasoning content
+- **Modern Web Interface**: Built with Next.js and Tailwind CSS for a beautiful, responsive UI
 
 ## Prerequisites
 
@@ -25,6 +26,7 @@ Before you begin, ensure you have:
 - [Bun](https://bun.sh) runtime installed
 - QianFan API credentials (for QianFan provider)
 - Groq API key (for Groq provider)
+- Node.js 18+ (for Next.js development)
 
 ## Getting Started
 
@@ -79,6 +81,16 @@ Worker-related parameters:
 - `--batch <number>`: Batch size for processing (default: 50)
 - `--delay <number>`: Delay between batches in milliseconds (default: 1000)
 - `--attempts <number>`: Maximum retry attempts per task (default: 3)
+
+### Web Interface
+
+To start the Next.js development server:
+
+```bash
+bun run dev
+```
+
+Visit `http://localhost:3000` to access the web interface.
 
 ### Worker System
 
@@ -172,16 +184,17 @@ Each region generates two JSON files:
 
 ```
 .
-├── config/           # Configuration files
-├── generators/       # Question and answer generators
-├── providers/        # AI provider implementations
-│   ├── groq/         # Groq provider
-│   └── qianfan/      # QianFan provider
-├── prompts/          # AI prompt templates
-├── types/            # TypeScript type definitions
-├── utils/            # Utility functions
-├── workers/          # Worker thread implementations
-└── index.ts          # Main entry point
+├── app/             # Next.js application files
+├── config/          # Configuration files
+├── generators/      # Question and answer generators
+├── providers/       # AI provider implementations
+│   ├── groq/        # Groq provider
+│   └── qianfan/     # QianFan provider
+├── prompts/         # AI prompt templates
+├── types/           # TypeScript type definitions
+├── utils/           # Utility functions
+├── workers/         # Worker thread implementations
+└── index.ts         # Main entry point
 ```
 
 ## Error Handling

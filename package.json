@@ -1,7 +1,14 @@
 {
   "name": "qa-generator",
+  "version": "0.0.5",
+  "description": "A sophisticated TypeScript application that leverages multiple AI providers to generate high-quality questions and answers for various regions in China",
+  "author": "Frad LEE <fradser@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FradSer/qa-generator.git"
+  },
   "module": "index.ts",
-  "type": "module",
   "scripts": {
     "start": "bun run index.ts",
     "dev": "next dev",
