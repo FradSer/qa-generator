@@ -42,119 +42,67 @@ export function AddRegionModal({
     <Modal 
       isOpen={isOpen} 
       onClose={onClose}
-      size="lg"
-      classNames={{
-        base: "rounded-2xl shadow-xl border border-white/60",
-        body: "py-6",
-        wrapper: "backdrop-blur-md bg-slate-900/10",
-        closeButton: "hover:bg-blue-50 transition-colors"
-      }}
-      backdrop="blur"
-      motionProps={{
-        variants: {
-          enter: {
-            y: 0,
-            opacity: 1,
-            transition: {
-              duration: 0.3,
-              ease: "easeOut"
-            }
-          },
-          exit: {
-            y: -20,
-            opacity: 0,
-            transition: {
-              duration: 0.2,
-              ease: "easeIn"
-            }
-          }
-        },
-        initial: { y: -20, opacity: 0 }
-      }}
+      className="bg-white/95 backdrop-blur-sm border border-slate-200/70 shadow-lg rounded-2xl"
     >
       <ModalContent>
-        <form onSubmit={handleSubmit}>
-          <ModalHeader className="px-8 py-5 border-b border-slate-100">
-            <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
-              <i className="ri-add-circle-line text-blue-600"></i>
-              Add New Region
-            </h3>
-          </ModalHeader>
-          <ModalBody className="px-8 space-y-6">
+        <ModalHeader className="px-6 py-5 border-b border-slate-200/50">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2.5">
+            <i className="ri-map-pin-add-line text-blue-600"></i>
+            Add New Region
+          </h3>
+        </ModalHeader>
+        <ModalBody className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <Input
-              label="Region Name (Chinese)"
-              placeholder="输入地区中文名称"
+              label="Region Name"
+              placeholder="Enter region name"
               value={newRegion.name}
-              onChange={(e) => setNewRegion(prev => ({ ...prev, name: e.target.value }))}
-              required
-              variant="bordered"
-              labelPlacement="outside"
+              onChange={(e) => setNewRegion({ ...newRegion, name: e.target.value })}
+              className="w-full"
               startContent={
                 <i className="ri-map-pin-line text-blue-600 flex-shrink-0"></i>
               }
-              className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
-              classNames={{
-                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100",
-                label: "text-slate-600 font-medium text-sm flex items-center gap-2.5",
-                input: "text-slate-700"
-              }}
             />
             <Input
               label="Pinyin"
-              placeholder="Enter pinyin for the region"
+              placeholder="Enter pinyin"
               value={newRegion.pinyin}
-              onChange={(e) => setNewRegion(prev => ({ ...prev, pinyin: e.target.value }))}
-              required
-              variant="bordered"
-              labelPlacement="outside"
+              onChange={(e) => setNewRegion({ ...newRegion, pinyin: e.target.value })}
+              className="w-full"
               startContent={
                 <i className="ri-keyboard-line text-blue-500 flex-shrink-0"></i>
               }
-              className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
-              classNames={{
-                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100",
-                label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                input: "text-slate-700"
-              }}
             />
             <Textarea
               label="Description"
               placeholder="Enter region description"
               value={newRegion.description}
-              onChange={(e) => setNewRegion(prev => ({ ...prev, description: e.target.value }))}
-              required
-              variant="bordered"
-              labelPlacement="outside"
-              minRows={3}
+              onChange={(e) => setNewRegion({ ...newRegion, description: e.target.value })}
+              className="w-full"
               startContent={
                 <i className="ri-file-text-line text-blue-500 flex-shrink-0"></i>
               }
-              className="w-full transition-all hover:translate-y-[-2px] duration-300 group"
-              classNames={{
-                inputWrapper: "bg-white shadow-sm border-slate-200 group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 min-h-[120px]",
-                label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                input: "text-slate-700"
-              }}
             />
-          </ModalBody>
-          <ModalFooter className="px-8 py-5 border-t border-slate-100 bg-slate-50/50">
-            <Button 
-              color="danger" 
-              variant="flat" 
+          </form>
+        </ModalBody>
+        <ModalFooter className="px-6 py-4 border-t border-slate-200/50 bg-slate-50/50">
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="flat"
               onPress={onClose}
-              className="font-medium min-w-[100px] bg-red-50 text-red-600 hover:bg-red-100"
+              className="px-4 py-2 rounded-lg font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors duration-300"
             >
               Cancel
             </Button>
-            <Button 
-              color="primary" 
+            <Button
+              color="primary"
               type="submit"
-              className="font-medium min-w-[100px] bg-blue-600 text-white hover:bg-blue-700"
+              className="px-4 py-2 rounded-lg font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:shadow-md hover:shadow-blue-200/50 hover:translate-y-[-2px] active:translate-y-[1px] transition-all duration-300"
             >
               Add Region
             </Button>
-          </ModalFooter>
-        </form>
+          </div>
+        </ModalFooter>
       </ModalContent>
     </Modal>
   );

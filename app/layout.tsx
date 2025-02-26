@@ -21,9 +21,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${outfit.variable} font-outfit h-full overflow-hidden text-slate-700`}>
+      <body className={`${outfit.variable}`}>
         <HeroUIProvider>
+          <main className="light">
           {children}
+          </main>
         </HeroUIProvider>
       </body>
     </html>

@@ -3,8 +3,7 @@
 import {
   Card,
   CardBody,
-  CardHeader,
-  ScrollShadow
+  CardHeader
 } from '@heroui/react';
 import { RefObject } from 'react';
 
@@ -19,78 +18,66 @@ type LogsPanelProps = {
 export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
   return (
     <div className="flex-1 w-full animate-in slide-in-from-right-5 duration-700 ease-out">
-      <Card className="h-full rounded-2xl card-glass overflow-hidden border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:border-slate-300/70">
-        <CardHeader className="px-6 py-5 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
+      <Card className="h-full rounded-2xl overflow-hidden border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:border-slate-300/70">
+        <CardHeader className="px-6 py-5 border-b border-slate-200/50">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2.5">
             <i className="ri-terminal-line text-blue-600"></i>
             Execution Logs
           </h2>
         </CardHeader>
-        <CardBody className="p-6 lg:flex-1 lg:overflow-hidden">
-          <ScrollShadow 
-            className="bg-gradient-to-r from-slate-900 to-slate-800 text-slate-100 h-full max-h-[400px] lg:max-h-full overflow-y-auto font-mono text-sm rounded-lg"
+        <CardBody className="p-6 h-[600px] flex flex-col">
+          <div 
+            className="bg-slate-900 text-slate-100 h-full overflow-y-auto font-mono text-sm rounded-xl scrollbar-none"
             role="log"
             aria-live="polite"
             aria-label="Execution logs"
-            hideScrollBar
           >
-            {logs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full p-6 text-slate-400">
-                <i className="ri-terminal-line text-slate-500/50 text-4xl mb-3"></i>
-                <span className="italic">No logs yet. Start generation to see logs here.</span>
-              </div>
-            ) : (
-              <div className="p-5 space-y-2.5">
-                {logs.map((log, index) => {
-                  // 根据日志内容设置不同的样式
-                  const isError = log.toLowerCase().includes('error');
+            <div className="space-y-2 p-4">
+              {logs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-slate-400">
+                  <i className="ri-terminal-line text-slate-500/50 text-4xl mb-3"></i>
+                  <span className="italic">No logs yet. Start generation to see logs here.</span>
+                </div>
+              ) : (
+                logs.map((log, index) => {
+                  const isError = log.toLowerCase().includes('error') || log.toLowerCase().includes('fail');
                   const isSuccess = log.toLowerCase().includes('complet') || log.toLowerCase().includes('success');
                   const isWarning = log.toLowerCase().includes('warning') || log.toLowerCase().includes('stopping');
                   
-                  let bgColor = 'hover:bg-blue-100/10';
+                  let bgColor = 'hover:bg-slate-800/50';
                   let borderColor = 'border-slate-700/50';
                   let icon = null;
-                  
+
                   if (isError) {
-                    bgColor = 'bg-red-900/20 hover:bg-red-900/30';
-                    borderColor = 'border-red-700/30';
-                    icon = (
-                      <i className="ri-error-warning-line text-red-400 mt-0.5 text-base flex-shrink-0"></i>
-                    );
+                    bgColor = 'bg-red-500/10 hover:bg-red-500/20';
+                    borderColor = 'border-red-500/30';
+                    icon = <i className="ri-error-warning-line text-red-500"></i>;
                   } else if (isSuccess) {
-                    bgColor = 'bg-green-900/20 hover:bg-green-900/30';
-                    borderColor = 'border-green-700/30';
-                    icon = (
-                      <i className="ri-checkbox-circle-line text-green-400 mt-0.5 text-base flex-shrink-0"></i>
-                    );
+                    bgColor = 'bg-green-500/10 hover:bg-green-500/20';
+                    borderColor = 'border-green-500/30';
+                    icon = <i className="ri-checkbox-circle-line text-green-500"></i>;
                   } else if (isWarning) {
-                    bgColor = 'bg-yellow-900/20 hover:bg-yellow-900/30';
-                    borderColor = 'border-yellow-700/30';
-                    icon = (
-                      <i className="ri-alert-line text-yellow-400 mt-0.5 text-base flex-shrink-0"></i>
-                    );
-                  } else {
-                    icon = (
-                      <i className="ri-chat-1-line text-blue-400 mt-0.5 text-base flex-shrink-0"></i>
-                    );
+                    bgColor = 'bg-yellow-500/10 hover:bg-yellow-500/20';
+                    borderColor = 'border-yellow-500/30';
+                    icon = <i className="ri-alert-line text-yellow-500"></i>;
                   }
-                  
+
                   return (
                     <div 
-                      key={index} 
-                      className={`rounded-md px-4 py-2.5 ${bgColor} border ${borderColor} shadow-md whitespace-pre-wrap transition-all duration-200 ease-out hover:translate-x-1 group`}
+                      key={index}
+                      className={`p-3 rounded-lg border ${borderColor} ${bgColor} transition-colors duration-300`}
                     >
-                      <div className="flex">
-                        <div className="mr-3 mt-0.5 transition-transform duration-200 group-hover:scale-110">{icon}</div>
-                        <div className="flex-1 opacity-95 transition-opacity duration-200 group-hover:opacity-100">{log}</div>
+                      <div className="flex items-start gap-2">
+                        {icon && <span className="mt-0.5">{icon}</span>}
+                        <span className="flex-1">{log}</span>
                       </div>
                     </div>
                   );
-                })}
-                <div ref={logsEndRef} />
-              </div>
-            )}
-          </ScrollShadow>
+                })
+              )}
+              <div ref={logsEndRef} />
+            </div>
+          </div>
         </CardBody>
       </Card>
     </div>

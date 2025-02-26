@@ -9,12 +9,11 @@ import {
   Input,
   Radio,
   RadioGroup,
-  ScrollShadow,
   Select,
   SelectItem
 } from '@heroui/react';
 import { Dispatch, SetStateAction } from 'react';
-import { Region, regions } from '../../config/config';
+import { regions } from '../../config/config';
 
 // Type from parent component
 type GenerationOptions = {
@@ -49,239 +48,201 @@ export function SettingsPanel({
   onAddRegionClick
 }: SettingsPanelProps) {
   return (
-    <div className="w-full lg:w-[480px] lg:min-w-[480px] flex-shrink-0 animate-in slide-in-from-left-5 duration-700 ease-out mb-6 lg:mb-0">
-      <Card className="h-full rounded-2xl border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:border-slate-300/70">
-        <CardHeader className="px-6 py-5 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2.5">
-            <i className="ri-settings-line text-blue-600"></i>
+    <div className="w-full lg:w-[480px] animate-in slide-in-from-left-5 duration-700 ease-out">
+      <Card className="h-full rounded-2xl overflow-hidden border border-slate-200/70 shadow-md bg-white/95 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:border-slate-300/70">
+        <CardHeader className="px-6 py-5 border-b border-slate-200/50">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2.5">
+            <i className="ri-settings-4-line text-blue-600"></i>
             Generation Settings
           </h2>
         </CardHeader>
-        <CardBody className="p-6 lg:flex-1 lg:overflow-hidden">
-          <ScrollShadow className="h-full max-h-[600px] lg:max-h-full">
-            <form onSubmit={handleSubmit} className="space-y-7 py-5 px-6">
-              {/* Operation Mode */}
-              <div className="space-y-3 bg-slate-50/80 p-5 rounded-xl shadow-sm border border-slate-100">
-                <label id="mode-label" className="text-sm font-semibold text-slate-600 flex items-center gap-2.5">
-                  <i className="ri-list-check-2 text-blue-600"></i>
-                  Operation Mode
+        <CardBody className="p-6">
+          <div className="h-full max-h-[calc(100vh-180px)] lg:max-h-full overflow-y-auto scrollbar-none">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Generation Mode */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Generation Mode
                 </label>
                 <RadioGroup
                   value={options.mode}
-                  onValueChange={(value) => setOptions(prev => ({ ...prev, mode: value as GenerationOptions['mode'] }))}
-                  orientation="horizontal"
-                  classNames={{
-                    wrapper: "gap-6",
-                    base: "border-blue-200 data-[selected=true]:border-blue-500 transition-all duration-200",
-                    label: "text-slate-600 font-medium"
-                  }}
-                  aria-labelledby="mode-label"
+                  onValueChange={(value) => setOptions({ ...options, mode: value as any })}
+                  className="flex flex-col gap-3"
                 >
-                  <Radio 
-                    value="questions" 
-                    className="transition-transform duration-200 ease-out hover:scale-102 active:scale-98"
-                    classNames={{
-                      base: "border-blue-200 data-[selected=true]:border-blue-500 transition-colors duration-200",
-                      label: "text-slate-600 font-medium"
-                    }}
-                  >
-                    Questions
-                  </Radio>
-                  <Radio 
-                    value="answers" 
-                    className="transition-transform duration-200 ease-out hover:scale-102 active:scale-98"
-                    classNames={{
-                      base: "border-blue-200 data-[selected=true]:border-blue-500 transition-colors duration-200",
-                      label: "text-slate-600 font-medium"
-                    }}
-                  >
-                    Answers
-                  </Radio>
-                  <Radio 
-                    value="all" 
-                    className="transition-transform duration-200 ease-out hover:scale-102 active:scale-98"
-                    classNames={{
-                      base: "border-blue-200 data-[selected=true]:border-blue-500 transition-colors duration-200",
-                      label: "text-slate-600 font-medium"
-                    }}
-                  >
-                    All
-                  </Radio>
+                  <div className="grid grid-cols-1 gap-3">
+                    <Radio value="questions" className="group w-full">
+                      <div className="w-full min-w-[400px] flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 group-data-[selected=true]:bg-blue-50/50 group-data-[selected=true]:border-blue-200 transition-colors duration-300 hover:bg-slate-100/50 hover:border-slate-300 cursor-pointer">
+                        <div className="mt-0.5">
+                          <i className="ri-questionnaire-line text-lg text-slate-400 group-data-[selected=true]:text-blue-500"></i>
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-700 group-data-[selected=true]:text-blue-600">Questions Only</div>
+                          <div className="text-sm text-slate-500 group-data-[selected=true]:text-blue-500/80">Generate only questions without answers</div>
+                        </div>
+                      </div>
+                    </Radio>
+                    <Radio value="answers" className="group w-full">
+                      <div className="w-full min-w-[400px] flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 group-data-[selected=true]:bg-blue-50/50 group-data-[selected=true]:border-blue-200 transition-colors duration-300 hover:bg-slate-100/50 hover:border-slate-300 cursor-pointer">
+                        <div className="mt-0.5">
+                          <i className="ri-chat-check-line text-lg text-slate-400 group-data-[selected=true]:text-blue-500"></i>
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-700 group-data-[selected=true]:text-blue-600">Answers Only</div>
+                          <div className="text-sm text-slate-500 group-data-[selected=true]:text-blue-500/80">Generate only answers for existing questions</div>
+                        </div>
+                      </div>
+                    </Radio>
+                    <Radio value="all" className="group w-full">
+                      <div className="w-full min-w-[400px] flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 group-data-[selected=true]:bg-blue-50/50 group-data-[selected=true]:border-blue-200 transition-colors duration-300 hover:bg-slate-100/50 hover:border-slate-300 cursor-pointer">
+                        <div className="mt-0.5">
+                          <i className="ri-chat-poll-line text-lg text-slate-400 group-data-[selected=true]:text-blue-500"></i>
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-700 group-data-[selected=true]:text-blue-600">Questions & Answers</div>
+                          <div className="text-sm text-slate-500 group-data-[selected=true]:text-blue-500/80">Generate both questions and answers</div>
+                        </div>
+                      </div>
+                    </Radio>
+                  </div>
                 </RadioGroup>
               </div>
 
+              <Divider className="bg-slate-200/70" />
+
               {/* Region Selection */}
-              <div className="space-y-3 bg-slate-50/80 p-5 rounded-xl shadow-sm border border-slate-100">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold text-slate-600 flex items-center gap-2.5">
-                    <i className="ri-map-pin-line text-blue-600"></i>
-                    Region Selection
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Region
                   </label>
                   <Button
                     size="sm"
                     variant="flat"
                     color="primary"
                     onPress={onAddRegionClick}
-                    className="bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all duration-200 ease-out hover:scale-102 active:scale-98"
+                    className="px-2.5 h-8 rounded-lg font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors duration-300"
                   >
-                    <span className="flex items-center gap-1.5">
-                      <i className="ri-add-circle-line"></i>
-                      Add New
-                    </span>
+                    <i className="ri-add-line mr-1"></i>
+                    Add Region
                   </Button>
                 </div>
                 <Select
-                  label="Select Region"
-                  placeholder="Choose a region"
-                  selectedKeys={[options.region]}
-                  onChange={(e) => setOptions(prev => ({ ...prev, region: e.target.value }))}
-                  variant="bordered"
-                  classNames={{
-                    base: "w-full transition-all duration-200",
-                    trigger: "bg-white hover:bg-blue-50 transition-colors duration-200",
-                    listbox: "bg-white rounded-lg transition-transform duration-200"
+                  value={options.region}
+                  onChange={(e) => {
+                    const selectedRegion = regions.find(r => r.name === e.target.value);
+                    if (selectedRegion) {
+                      setOptions({ 
+                        ...options, 
+                        region: `${selectedRegion.pinyin}` 
+                      });
+                    }
                   }}
+                  className="w-full"
+                  startContent={
+                    <i className="ri-map-pin-line text-blue-500 flex-shrink-0"></i>
+                  }
+                  placeholder="Select a region"
                 >
-                  {regions.map((region: Region) => (
+                  {regions.map((region) => (
                     <SelectItem 
-                      key={region.pinyin} 
-                      textValue={`${region.name} (${region.pinyin})`}
-                      className="rounded-lg transition-all duration-200 data-[selected=true]:bg-blue-200 data-[selected=true]:border data-[selected=true]:border-blue-300 hover:bg-blue-50"
+                      key={region.name} 
+                      textValue={region.name}
+                      className="group"
                     >
-                      <div className="flex flex-col">
-                        <span className="font-medium">{region.name} ({region.pinyin})</span>
-                        <span className="text-xs text-slate-500 mt-0.5">{region.description}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <i className="ri-map-pin-2-line text-slate-400 group-data-[selected=true]:text-blue-500"></i>
+                          <span className="font-medium text-slate-700 group-data-[selected=true]:text-blue-600">{region.name}</span>
+                          <span className="text-sm text-slate-500">({region.pinyin})</span>
+                        </div>
+                        {region.description && (
+                          <div className="text-sm text-slate-500 group-data-[selected=true]:text-blue-500/80 pl-6">
+                            {region.description}
+                          </div>
+                        )}
                       </div>
                     </SelectItem>
                   ))}
                 </Select>
               </div>
 
-              <Divider className="my-2 opacity-70" />
+              <Divider className="bg-slate-200/70" />
 
-              {/* Numeric Settings Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Input
-                  type="number"
-                  label="Total Questions"
-                  value={options.totalCount.toString()}
-                  onChange={(e) => setOptions(prev => ({ ...prev, totalCount: parseInt(e.target.value) }))}
-                  min={1}
-                  variant="bordered"
-                  labelPlacement="outside"
-                  startContent={
-                    <i className="ri-question-line"></i>
-                  }
-                  className="w-full group"
-                  classNames={{
-                    inputWrapper: "bg-white shadow-sm border-slate-200 transition-all duration-200 ease-out group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow-md group-hover:translate-y-[-2px] group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 group-active:translate-y-[1px]",
-                    label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                    input: "text-slate-700"
-                  }}
-                />
-
-                <Input
-                  type="number"
-                  label="Worker Count"
-                  value={options.workerCount.toString()}
-                  onChange={(e) => setOptions(prev => ({ ...prev, workerCount: parseInt(e.target.value) }))}
-                  min={1}
-                  max={20}
-                  variant="bordered"
-                  labelPlacement="outside"
-                  startContent={
-                    <i className="ri-robot-2-line"></i>
-                  }
-                  className="w-full group"
-                  classNames={{
-                    inputWrapper: "bg-white shadow-sm border-slate-200 transition-all duration-200 ease-out group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow-md group-hover:translate-y-[-2px] group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 group-active:translate-y-[1px]",
-                    label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                    input: "text-slate-700"
-                  }}
-                />
-
-                <Input
-                  type="number"
-                  label="Max Questions/Worker"
-                  value={options.maxQPerWorker.toString()}
-                  onChange={(e) => setOptions(prev => ({ ...prev, maxQPerWorker: parseInt(e.target.value) }))}
-                  min={1}
-                  max={100}
-                  variant="bordered"
-                  labelPlacement="outside"
-                  startContent={
-                    <i className="ri-stack-line"></i>
-                  }
-                  className="w-full group"
-                  classNames={{
-                    inputWrapper: "bg-white shadow-sm border-slate-200 transition-all duration-200 ease-out group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow-md group-hover:translate-y-[-2px] group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 group-active:translate-y-[1px]",
-                    label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                    input: "text-slate-700"
-                  }}
-                />
-
-                <Input
-                  type="number"
-                  label="Max Attempts"
-                  value={options.maxAttempts.toString()}
-                  onChange={(e) => setOptions(prev => ({ ...prev, maxAttempts: parseInt(e.target.value) }))}
-                  min={1}
-                  max={10}
-                  variant="bordered"
-                  labelPlacement="outside"
-                  startContent={
-                    <i className="ri-restart-line"></i>
-                  }
-                  className="w-full group"
-                  classNames={{
-                    inputWrapper: "bg-white shadow-sm border-slate-200 transition-all duration-200 ease-out group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow-md group-hover:translate-y-[-2px] group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 group-active:translate-y-[1px]",
-                    label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                    input: "text-slate-700"
-                  }}
-                />
-
-                <Input
-                  type="number"
-                  label="Batch Size"
-                  value={options.batchSize.toString()}
-                  onChange={(e) => setOptions(prev => ({ ...prev, batchSize: parseInt(e.target.value) }))}
-                  min={1}
-                  max={100}
-                  variant="bordered"
-                  labelPlacement="outside"
-                  startContent={
-                    <i className="ri-layout-grid-line"></i>
-                  }
-                  className="w-full group"
-                  classNames={{
-                    inputWrapper: "bg-white shadow-sm border-slate-200 transition-all duration-200 ease-out group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow-md group-hover:translate-y-[-2px] group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 group-active:translate-y-[1px]",
-                    label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                    input: "text-slate-700"
-                  }}
-                />
-
-                <Input
-                  type="number"
-                  label="Delay (ms)"
-                  value={options.delay.toString()}
-                  onChange={(e) => setOptions(prev => ({ ...prev, delay: parseInt(e.target.value) }))}
-                  min={0}
-                  step={100}
-                  variant="bordered"
-                  labelPlacement="outside"
-                  startContent={
-                    <i className="ri-time-line"></i>
-                  }
-                  className="w-full group"
-                  classNames={{
-                    inputWrapper: "bg-white shadow-sm border-slate-200 transition-all duration-200 ease-out group-hover:border-blue-300 group-hover:bg-blue-50/30 group-hover:shadow-md group-hover:translate-y-[-2px] group-focus-within:border-blue-500 group-focus-within:ring-2 group-focus-within:ring-blue-100 group-active:translate-y-[1px]",
-                    label: "text-slate-700 font-medium text-sm flex items-center gap-2",
-                    input: "text-slate-700"
-                  }}
-                />
+              {/* Generation Parameters */}
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Generation Parameters
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    type="number"
+                    label="Total Count"
+                    value={options.totalCount.toString()}
+                    onChange={(e) => setOptions({ ...options, totalCount: parseInt(e.target.value) })}
+                    min={1}
+                    className="w-full"
+                    startContent={
+                      <i className="ri-numbers-line text-blue-500 flex-shrink-0"></i>
+                    }
+                  />
+                  <Input
+                    type="number"
+                    label="Worker Count"
+                    value={options.workerCount.toString()}
+                    onChange={(e) => setOptions({ ...options, workerCount: parseInt(e.target.value) })}
+                    min={1}
+                    className="w-full"
+                    startContent={
+                      <i className="ri-robot-line text-blue-500 flex-shrink-0"></i>
+                    }
+                  />
+                  <Input
+                    type="number"
+                    label="Max Q/Worker"
+                    value={options.maxQPerWorker.toString()}
+                    onChange={(e) => setOptions({ ...options, maxQPerWorker: parseInt(e.target.value) })}
+                    min={1}
+                    className="w-full"
+                    startContent={
+                      <i className="ri-stack-line text-blue-500 flex-shrink-0"></i>
+                    }
+                  />
+                  <Input
+                    type="number"
+                    label="Max Attempts"
+                    value={options.maxAttempts.toString()}
+                    onChange={(e) => setOptions({ ...options, maxAttempts: parseInt(e.target.value) })}
+                    min={1}
+                    className="w-full"
+                    startContent={
+                      <i className="ri-restart-line text-blue-500 flex-shrink-0"></i>
+                    }
+                  />
+                  <Input
+                    type="number"
+                    label="Batch Size"
+                    value={options.batchSize.toString()}
+                    onChange={(e) => setOptions({ ...options, batchSize: parseInt(e.target.value) })}
+                    min={1}
+                    className="w-full"
+                    startContent={
+                      <i className="ri-folder-line text-blue-500 flex-shrink-0"></i>
+                    }
+                  />
+                  <Input
+                    type="number"
+                    label="Delay (ms)"
+                    value={options.delay.toString()}
+                    onChange={(e) => setOptions({ ...options, delay: parseInt(e.target.value) })}
+                    min={0}
+                    className="w-full"
+                    startContent={
+                      <i className="ri-time-line text-blue-500 flex-shrink-0"></i>
+                    }
+                  />
+                </div>
               </div>
 
-              {/* Submit Button */}
               <Button
                 type={isRunning ? "button" : "submit"}
                 onPress={isRunning ? handleStop : undefined}
@@ -292,7 +253,7 @@ export function SettingsPanel({
                   : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:shadow-lg hover:shadow-blue-200/50 hover:translate-y-[-2px] active:translate-y-[1px]'
                 }`}
                 size="lg"
-                variant={isRunning ? "solid" : "solid"}
+                variant="solid"
               >
                 <span className="flex items-center justify-center gap-2">
                   {isRunning ? (
@@ -309,7 +270,7 @@ export function SettingsPanel({
                 </span>
               </Button>
             </form>
-          </ScrollShadow>
+          </div>
         </CardBody>
       </Card>
     </div>

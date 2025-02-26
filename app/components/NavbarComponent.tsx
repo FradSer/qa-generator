@@ -1,10 +1,10 @@
 'use client';
 
 import {
-  Badge,
-  Navbar,
-  NavbarBrand,
-  NavbarContent
+    Badge,
+    Navbar,
+    NavbarBrand,
+    NavbarContent
 } from '@heroui/react';
 
 type NavbarProps = {
@@ -18,32 +18,36 @@ type NavbarProps = {
 export function NavbarComponent({ title, isRunning }: NavbarProps) {
   return (
     <Navbar
-      className="fixed top-0 w-full z-10 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm transition-all duration-300 hover:bg-white/95"
+      className="fixed top-0 w-full z-50 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-all duration-300"
       maxWidth="full"
       isBordered={false}
     >
       <NavbarContent className="px-6 py-3">
         <NavbarBrand className="flex items-center gap-4">
           <div className="flex items-center">
-            <i className="ri-flashlight-line text-blue-600 text-2xl mr-3 transition-transform duration-200 hover:scale-110"></i>
-            <h1 className="text-xl font-semibold text-slate-700 tracking-tight transition-colors duration-200 hover:text-slate-900">
+            <i className="ri-dashboard-3-line text-blue-600 text-2xl mr-3 transition-transform duration-300 hover:scale-110"></i>
+            <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-200 tracking-tight">
               {title}
             </h1>
           </div>
           <Badge
             color={isRunning ? "primary" : "success"}
             variant={isRunning ? "solid" : "flat"}
-            size="lg"
-            className={`font-medium shadow-sm transition-all duration-200 ease-out ${
+            size="sm"
+            className={`font-medium shadow-sm transition-all duration-300 ${
               isRunning 
-                ? 'animate-pulse scale-105' 
-                : 'opacity-90 hover:bg-blue-50 hover:opacity-100 hover:scale-102 active:scale-98'
+                ? 'animate-pulse hover:animate-none hover:scale-105' 
+                : 'opacity-90 hover:opacity-100 hover:scale-105'
             }`}
             aria-live="polite"
           >
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full transition-colors duration-200 ${isRunning ? 'bg-white' : 'bg-green-500'}`}></div>
-              {isRunning ? 'Running' : 'Ready'}
+            <div className="flex items-center gap-1.5 px-0.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                isRunning 
+                  ? 'bg-white animate-ping' 
+                  : 'bg-green-500'
+              }`}></div>
+              <span className="text-sm">{isRunning ? 'Running' : 'Idle'}</span>
             </div>
           </Badge>
         </NavbarBrand>
