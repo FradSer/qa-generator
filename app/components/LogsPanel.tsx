@@ -32,10 +32,10 @@ export function LogsPanel({ logs, logsEndRef }: LogsPanelProps) {
             aria-live="polite"
             aria-label="Execution logs"
           >
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 h-full">
               {logs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-6 text-slate-400">
-                  <i className="ri-terminal-line text-slate-500/50 text-4xl mb-2"></i>
+                <div className="h-full w-full flex flex-col items-center justify-center text-slate-400">
+                  <i className="ri-terminal-line text-slate-500/50 text-4xl mb-3"></i>
                   <span className="italic">No logs yet. Start generation to see logs here.</span>
                 </div>
               ) : (

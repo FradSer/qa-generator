@@ -31,22 +31,25 @@ export function NavbarComponent({ title, isRunning }: NavbarProps) {
             </h1>
           </div>
           <Badge
-            color={isRunning ? "primary" : "success"}
-            variant={isRunning ? "solid" : "flat"}
+            color={isRunning ? "success" : "default"}
+            variant="flat"
             size="sm"
-            className={`font-medium shadow-sm transition-all duration-300 ${
-              isRunning 
-                ? 'animate-pulse hover:animate-none hover:scale-105' 
-                : 'opacity-90 hover:opacity-100 hover:scale-105'
-            }`}
+            className="font-medium shadow-sm transition-all duration-300 hover:scale-105"
             aria-live="polite"
           >
             <div className="flex items-center gap-1.5 px-0.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                isRunning 
-                  ? 'bg-white animate-ping' 
-                  : 'bg-green-500'
-              }`}></div>
+              <div className={`relative w-1.5 h-1.5`}>
+                {/* Static dot */}
+                <div className={`absolute inset-0 rounded-full ${
+                  isRunning ? 'bg-green-600' : 'bg-slate-600'
+                }`}></div>
+                {/* Animated ping effect */}
+                <div className={`absolute inset-0 rounded-full ${
+                  isRunning 
+                    ? 'bg-green-500/50 animate-ping' 
+                    : 'bg-gray-500/50 animate-pulse'
+                }`}></div>
+              </div>
               <span className="text-sm">{isRunning ? 'Running' : 'Idle'}</span>
             </div>
           </Badge>
