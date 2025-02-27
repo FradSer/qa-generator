@@ -25,6 +25,7 @@ type GenerationOptions = {
   maxAttempts: number;
   batchSize: number;
   delay: number;
+  provider: string;
 };
 
 type SettingsPanelProps = {

@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 
 export async function POST(request: Request) {
   const encoder = new TextEncoder();
@@ -22,14 +22,26 @@ export async function POST(request: Request) {
         ];
 
         // Log the command being executed
-        const commandStr = `bun ${args.join(' ')}`;
+        const commandStr = `AI_PROVIDER=${options.provider} bun ${args.join(' ')}`;
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', message: `Executing command: ${commandStr}` })}\n\n`));
 
-        // Spawn the bun process
-        const process = spawn('bun', args);
+        // Spawn the bun process with environment variables
+        const childProcess: ChildProcess = spawn('bun', args, {
+          env: {
+            ...process.env,
+            AI_PROVIDER: options.provider,
+            // 传递所有 API keys
+            GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+            QIANFAN_ACCESS_KEY: process.env.QIANFAN_ACCESS_KEY || '',
+            QIANFAN_SECRET_KEY: process.env.QIANFAN_SECRET_KEY || '',
+            OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+            OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || '',
+            PATH: process.env.PATH || '' // 确保 PATH 环境变量也被传递
+          }
+        });
 
         // Handle process events
-        process.stdout.on('data', (data) => {
+        childProcess.stdout?.on('data', (data: Buffer) => {
           try {
             const message = data.toString();
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', message })}\n\n`));
@@ -38,7 +50,7 @@ export async function POST(request: Request) {
           }
         });
 
-        process.stderr.on('data', (data) => {
+        childProcess.stderr?.on('data', (data: Buffer) => {
           try {
             const message = data.toString();
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message })}\n\n`));
@@ -47,7 +59,7 @@ export async function POST(request: Request) {
           }
         });
 
-        process.on('close', (code) => {
+        childProcess.on('close', (code: number | null) => {
           try {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end', code })}\n\n`));
             controller.close();
@@ -56,7 +68,7 @@ export async function POST(request: Request) {
           }
         });
 
-        process.on('error', (error: Error) => {
+        childProcess.on('error', (error: Error) => {
           try {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`));
             controller.close();

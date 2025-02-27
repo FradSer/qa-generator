@@ -4,18 +4,34 @@ import {
   Badge,
   Navbar,
   NavbarBrand,
-  NavbarContent
+  NavbarContent,
+  Select,
+  SelectItem
 } from '@heroui/react';
+
+export type Provider = {
+  id: string;
+  name: string;
+};
 
 type NavbarProps = {
   title: string;
   isRunning: boolean;
+  providers: Provider[];
+  selectedProvider: string;
+  onProviderChange: (providerId: string) => void;
 };
 
 /**
- * Application navbar component that displays title and running status
+ * Application navbar component that displays title, running status and provider selection
  */
-export function NavbarComponent({ title, isRunning }: NavbarProps) {
+export function NavbarComponent({ 
+  title, 
+  isRunning, 
+  providers,
+  selectedProvider,
+  onProviderChange 
+}: NavbarProps) {
   return (
     <Navbar
       className="fixed top-0 w-full z-50 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-all duration-300"
@@ -54,6 +70,26 @@ export function NavbarComponent({ title, isRunning }: NavbarProps) {
             </div>
           </Badge>
         </NavbarBrand>
+      </NavbarContent>
+
+      <NavbarContent className="px-4 sm:px-6" justify="end">
+        <div className="flex items-center gap-2">
+          <i className="ri-cpu-line text-blue-600 text-lg"></i>
+          <Select
+            placeholder="Select a provider"
+            selectedKeys={[selectedProvider]}
+            className="w-48"
+            onChange={(e) => onProviderChange(e.target.value)}
+            size="sm"
+            variant="bordered"
+          >
+            {providers.map((provider) => (
+              <SelectItem key={provider.id}>
+                {provider.name}
+              </SelectItem>
+            ))}
+          </Select>
+        </div>
       </NavbarContent>
     </Navbar>
   );

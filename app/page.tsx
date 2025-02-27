@@ -6,6 +6,7 @@ import { AddRegionModal } from './components/AddRegionModal';
 import { LogsPanel } from './components/LogsPanel';
 import { NavbarComponent } from './components/Navbar';
 import { SettingsPanel } from './components/SettingsPanel';
+import { DEFAULT_PROVIDER, providers } from './config/providers';
 
 // Types from the original codebase
 type GenerationOptions = {
@@ -17,19 +18,23 @@ type GenerationOptions = {
   maxAttempts: number;
   batchSize: number;
   delay: number;
+  provider: string;
 };
 
 export default function ControlPanel() {
   const [options, setOptions] = useState<GenerationOptions>({
-    mode: 'all',
-    region: regions.length > 0 ? regions[0].pinyin : '',
-    totalCount: 1000,
+    mode: 'questions',
+    region: regions[0].name,
+    totalCount: 100,
     workerCount: 5,
-    maxQPerWorker: 50,
+    maxQPerWorker: 20,
     maxAttempts: 3,
-    batchSize: 50,
+    batchSize: 5,
     delay: 1000,
+    provider: DEFAULT_PROVIDER
   });
+
+  const [selectedProvider, setSelectedProvider] = useState(DEFAULT_PROVIDER);
 
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -49,10 +54,21 @@ export default function ControlPanel() {
     }
   }, [logs]);
 
+  // 监听 selectedProvider 变化，更新 options
+  useEffect(() => {
+    setOptions(prev => ({
+      ...prev,
+      provider: selectedProvider
+    }));
+  }, [selectedProvider]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsRunning(true);
-    setLogs([`Starting ${options.mode} generation for region ${options.region}...`]);
+    setLogs([
+      `Starting ${options.mode} generation for region ${options.region}...`,
+      `Using provider: ${options.provider}`
+    ]);
 
     processRef.current = new AbortController();
 
@@ -179,7 +195,13 @@ export default function ControlPanel() {
       <div className="absolute inset-0 bg-grid-slate-200/60 [mask-image:radial-gradient(ellipse_90%_90%_at_50%_50%,#fff,transparent)]"></div>
       
       {/* Navigation Bar */}
-      <NavbarComponent title="QA Generator Control Panel" isRunning={isRunning} />
+      <NavbarComponent 
+        title="QA Generator Control Panel" 
+        isRunning={isRunning} 
+        providers={providers}
+        selectedProvider={selectedProvider}
+        onProviderChange={setSelectedProvider}
+      />
       
       {/* Main Content */}
       <div className="relative mt-[72px] min-h-[calc(100vh-72px)]">
