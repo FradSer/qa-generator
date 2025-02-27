@@ -13,6 +13,7 @@ export interface StreamResponse {
   choices: Array<{
     delta: {
       content?: string;
+      reasoning_content?: string;
     };
   }>;
 }
@@ -20,11 +21,9 @@ export interface StreamResponse {
 /**
  * Base interface for AI provider client
  */
-import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
-
 export interface AIProviderClient {
   chat(params: {
-    messages: ChatCompletionMessageParam[];
+    messages: Array<{ role: string; content: string }>;
     stream?: boolean;
     temperature?: number;
     maxTokens?: number;

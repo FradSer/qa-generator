@@ -1,5 +1,7 @@
 import { setupGroqEnvironment } from '../providers/groq/client';
 import { groqService } from '../providers/groq/service';
+import { setupOpenAIEnvironment } from '../providers/openai/client';
+import { openaiService } from '../providers/openai/service';
 import { setupQianFanEnvironment } from '../providers/qianfan/client';
 import { qianfanService } from '../providers/qianfan/service';
 import type { QAItem } from '../types/types';
@@ -10,7 +12,7 @@ import Logger from '../utils/logger';
 const provider = process.env.AI_PROVIDER?.toLowerCase() || 'qianfan';
 
 // Initialize service
-let service: typeof qianfanService | typeof groqService;
+let service: typeof qianfanService | typeof groqService | typeof openaiService;
 
 if (provider === 'qianfan') {
   setupQianFanEnvironment();
@@ -18,6 +20,9 @@ if (provider === 'qianfan') {
 } else if (provider === 'groq') {
   setupGroqEnvironment();
   service = groqService;
+} else if (provider === 'openai') {
+  setupOpenAIEnvironment();
+  service = openaiService;
 }
 
 /**

@@ -3,6 +3,8 @@ import type { Region } from './config/config';
 import { getRegionByPinyin, getRegionFileNames } from './config/config';
 import { setupGroqEnvironment } from './providers/groq/client';
 import { groqService } from './providers/groq/service';
+import { setupOpenAIEnvironment } from './providers/openai/client';
+import { openaiService } from './providers/openai/service';
 import { setupQianFanEnvironment } from './providers/qianfan/client';
 import { qianfanService } from './providers/qianfan/service';
 import type { QAItem, Question } from './types/types';
@@ -671,6 +673,9 @@ async function main() {
       case 'groq':
         setupGroqEnvironment();
         break;
+      case 'openai':
+        setupOpenAIEnvironment();
+        break;
       default:
         throw new Error(`Unsupported AI provider: ${provider}`);
     }
@@ -680,9 +685,12 @@ async function main() {
   }
 
   // Select provider functions
-  const { generateAnswer, generateQuestionsFromPrompt } = provider === 'groq' 
-    ? { generateAnswer: groqService.generateAnswer.bind(groqService), generateQuestionsFromPrompt: groqService.generateQuestionsFromPrompt.bind(groqService) }
-    : { generateAnswer: qianfanService.generateAnswer.bind(qianfanService), generateQuestionsFromPrompt: qianfanService.generateQuestionsFromPrompt.bind(qianfanService) };
+  const { generateAnswer, generateQuestionsFromPrompt } = 
+    provider === 'groq' 
+      ? { generateAnswer: groqService.generateAnswer.bind(groqService), generateQuestionsFromPrompt: groqService.generateQuestionsFromPrompt.bind(groqService) }
+      : provider === 'openai'
+        ? { generateAnswer: openaiService.generateAnswer.bind(openaiService), generateQuestionsFromPrompt: openaiService.generateQuestionsFromPrompt.bind(openaiService) }
+        : { generateAnswer: qianfanService.generateAnswer.bind(qianfanService), generateQuestionsFromPrompt: qianfanService.generateQuestionsFromPrompt.bind(qianfanService) };
 
   // Execute requested mode
   try {
