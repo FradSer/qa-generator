@@ -28,7 +28,29 @@ const SENSITIVE_ENV_VARS = [
   'OPENAI_API_KEY',
   'DATABASE_URL',
   'JWT_SECRET',
-  'SESSION_SECRET'
+  'SESSION_SECRET',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'GOOGLE_CLIENT_SECRET',
+  'SLACK_BOT_TOKEN',
+  'GITHUB_TOKEN',
+  'NPM_TOKEN'
+];
+
+/**
+ * Additional patterns for environment variables
+ */
+const ENV_SENSITIVE_PATTERNS = [
+  /_KEY$/i,
+  /_SECRET$/i,
+  /_TOKEN$/i,
+  /_PASSWORD$/i,
+  /^API_/i,
+  /^SECRET_/i,
+  /^TOKEN_/i,
+  /_API$/i,
+  /^DATABASE_/i,
+  /^DB_/i
 ];
 
 /**
@@ -129,10 +151,35 @@ export class SecureLogger {
     const sanitized: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(env)) {
-      if (SENSITIVE_ENV_VARS.includes(key) || SENSITIVE_PATTERNS.some(pattern => pattern.test(key))) {
+      const isSensitive = SENSITIVE_ENV_VARS.includes(key) || 
+        SENSITIVE_PATTERNS.some(pattern => pattern.test(key)) ||
+        ENV_SENSITIVE_PATTERNS.some(pattern => pattern.test(key));
+
+      if (isSensitive) {
         sanitized[key] = this.REDACTED_PLACEHOLDER;
       } else {
         sanitized[key] = this.sanitize(value);
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Sanitize process.env specifically
+   */
+  static sanitizeProcessEnv(): Record<string, string> {
+    const sanitized: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(process.env)) {
+      const isSensitive = SENSITIVE_ENV_VARS.includes(key) || 
+        SENSITIVE_PATTERNS.some(pattern => pattern.test(key)) ||
+        ENV_SENSITIVE_PATTERNS.some(pattern => pattern.test(key));
+
+      if (isSensitive) {
+        sanitized[key] = this.REDACTED_PLACEHOLDER;
+      } else {
+        sanitized[key] = value || '';
       }
     }
 
