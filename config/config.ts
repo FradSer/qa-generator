@@ -29,10 +29,9 @@ export function getRegionByName(name: string): Region | undefined {
   return regions.find(region => region.name === name);
 }
 
-// Get file names for a region
+// Get file names for a region (DEPRECATED - Use InputValidator.validateFilePath)
 export function getRegionFileNames(pinyin: string): { questionFile: string; qaFile: string } {
-  return {
-    questionFile: `${pinyin}_q_results.json`,
-    qaFile: `${pinyin}_qa_results.json`
-  };
+  // Import here to avoid circular dependencies
+  const { InputValidator } = require('../utils/input-validation');
+  return InputValidator.validateFilePath(pinyin);
 } 

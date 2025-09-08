@@ -13,7 +13,7 @@ import Logger from '../utils/logger';
  */
 export class WorkerPool {
   private workers: Worker[];
-  private taskQueue: (() => Promise<any>)[];
+  private taskQueue: (() => void)[];
   private busyWorkers: Set<Worker>;
   private poolId: string;
 
@@ -74,16 +74,50 @@ export class WorkerPool {
       } else {
         // Queue the task if no worker is available
         Logger.debug(`No workers available, queuing task (${this.taskQueue.length + 1} tasks queued)`);
-        this.taskQueue.push(async () => {
-          try {
-            const result = await this.execute<T>(task);
-            resolve(result);
-          } catch (error) {
-            reject(error);
-          }
-        });
+        this.taskQueue.push(() => this.executeTask<T>(task, resolve, reject));
       }
     });
+  }
+
+  /**
+   * Executes a task directly without queueing (internal method)
+   * @param task - Task to be executed
+   * @param resolve - Promise resolve callback
+   * @param reject - Promise reject callback
+   */
+  private executeTask<T>(
+    task: any,
+    resolve: (value: T) => void,
+    reject: (reason?: any) => void
+  ): void {
+    const worker = this.getAvailableWorker();
+    
+    if (worker) {
+      this.busyWorkers.add(worker);
+      worker.postMessage(task);
+      Logger.debug(`Assigned queued task to worker (${this.busyWorkers.size}/${this.workers.length} busy)`);
+      
+      const messageHandler = (e: MessageEvent) => {
+        worker.onmessage = null;
+        this.busyWorkers.delete(worker);
+        Logger.debug(`Queued task completed (${this.busyWorkers.size}/${this.workers.length} busy)`);
+        resolve(e.data as T);
+      };
+      
+      const errorHandler = (e: ErrorEvent) => {
+        worker.onerror = null;
+        this.busyWorkers.delete(worker);
+        Logger.error(`Worker error on queued task: ${e.message}`);
+        reject(e);
+      };
+      
+      worker.onmessage = messageHandler;
+      worker.onerror = errorHandler;
+    } else {
+      // Worker became unavailable, re-queue the task
+      Logger.debug(`Worker unavailable during queue processing, re-queuing task`);
+      this.taskQueue.unshift(() => this.executeTask<T>(task, resolve, reject));
+    }
   }
 
   /**
@@ -101,12 +135,23 @@ export class WorkerPool {
    */
   private handleWorkerMessage(worker: Worker, data: any) {
     this.busyWorkers.delete(worker);
-    
-    // Process next task in queue if any
-    if (this.taskQueue.length > 0) {
+    this.processNextQueuedTask();
+  }
+
+  /**
+   * Process the next task in queue if any
+   */
+  private processNextQueuedTask(): void {
+    if (this.taskQueue.length > 0 && this.getAvailableWorker()) {
       const nextTask = this.taskQueue.shift();
-      Logger.debug(`Processing next queued task (${this.taskQueue.length} remaining)`);
-      nextTask?.();
+      if (nextTask) {
+        Logger.debug(`Processing next queued task (${this.taskQueue.length} remaining)`);
+        try {
+          nextTask();
+        } catch (error) {
+          Logger.error(`Error executing queued task: ${error}`);
+        }
+      }
     }
   }
 
@@ -118,13 +163,7 @@ export class WorkerPool {
   private handleWorkerError(worker: Worker, error: ErrorEvent) {
     Logger.error(`Worker error: ${error.message}`);
     this.busyWorkers.delete(worker);
-    
-    // Process next task in queue if any
-    if (this.taskQueue.length > 0) {
-      const nextTask = this.taskQueue.shift();
-      Logger.debug(`Processing next queued task after error (${this.taskQueue.length} remaining)`);
-      nextTask?.();
-    }
+    this.processNextQueuedTask();
   }
 
   /**
