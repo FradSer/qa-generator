@@ -8,9 +8,10 @@
     "type": "git",
     "url": "git+https://github.com/FradSer/qa-generator.git"
   },
-  "module": "index.ts",
+  "module": "app.ts",
   "scripts": {
-    "start": "bun run index.ts",
+    "start": "bun run app.ts",
+    "start:legacy": "bun run index.legacy.ts",
     "dev": "next dev",
     "build": "next build",
     "start:next": "next start"
