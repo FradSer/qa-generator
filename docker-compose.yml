@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  qa-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    image: qa-generator:latest
+    container_name: qa-generator-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - QA_GENERATOR_API_KEY=${QA_GENERATOR_API_KEY}
+      - AI_PROVIDER=${AI_PROVIDER:-qianfan}
+      - QIANFAN_ACCESS_KEY=${QIANFAN_ACCESS_KEY}
+      - QIANFAN_SECRET_KEY=${QIANFAN_SECRET_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-30}
+      - MAX_MEMORY_MB=${MAX_MEMORY_MB:-2048}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - qa_data:/app/data
+      - qa_logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - qa_network
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/docker-healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: ${MAX_MEMORY_MB:-2048}M
+        reservations:
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: qa-generator-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - qa_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  nginx:
+    image: nginx:alpine
+    container_name: qa-generator-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - qa_logs:/var/log/nginx
+    depends_on:
+      - qa-generator
+    networks:
+      - qa_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: qa-generator-monitoring
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - qa_network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+volumes:
+  qa_data:
+    driver: local
+  qa_logs:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  qa_network:
+    driver: bridge
