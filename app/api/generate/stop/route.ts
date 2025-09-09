@@ -1,36 +1,78 @@
 import { NextResponse } from 'next/server';
+import { spawn } from 'child_process';
+import { InputValidator } from '../../../../utils/input-validation';
 
-export async function POST() {
-  try {
-    // Send SIGTERM to all running bun processes
-    const killCommand = process.platform === 'win32' ? 'taskkill /F /IM bun.exe' : 'pkill -15 bun';
-    await new Promise((resolve, reject) => {
-      const { exec } = require('child_process');
-      exec(killCommand, (error: Error | null) => {
-        if (error) {
-          // Ignore error if no process were found
-          if (error.message.includes('no process found') || 
-              error.message.includes('not found') ||
-              error.message.includes('no process killed')) {
-            resolve(null);
-          } else {
-            reject(error);
-          }
+/**
+ * Secure process termination utility
+ */
+class SecureProcessManager {
+  private static getKillCommands(platform: 'win32' | 'unix') {
+    if (platform === 'win32') {
+      return {
+        graceful: ['taskkill', ['/F', '/IM', 'bun.exe']],
+        force: ['taskkill', ['/F', '/IM', 'bun.exe']]
+      };
+    } else {
+      return {
+        graceful: ['pkill', ['-15', 'bun']],
+        force: ['pkill', ['-9', 'bun']]
+      };
+    }
+  }
+
+  private static execSecureCommand(command: string, args: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const process = spawn(command, args, { 
+        stdio: 'pipe',
+        timeout: 5000 // 5 second timeout
+      });
+
+      process.on('close', (code) => {
+        // Ignore "no process found" type errors (codes 1, 123, etc)
+        if (code === 0 || code === 1 || code === 123) {
+          resolve();
         } else {
-          resolve(null);
+          reject(new Error(`Command failed with code ${code}`));
+        }
+      });
+
+      process.on('error', (error) => {
+        // Ignore common "no process found" errors
+        if (error.message.includes('ESRCH') || 
+            error.message.includes('no such process')) {
+          resolve();
+        } else {
+          reject(error);
         }
       });
     });
+  }
 
-    // Give processes a moment to clean up
-    await new Promise(resolve => setTimeout(resolve, 500));
+  static async terminateProcesses(): Promise<void> {
+    // Validate and normalize platform
+    const platform = InputValidator.validatePlatform(process.platform);
+    const commands = this.getKillCommands(platform);
 
-    // Force kill any remaining processes
-    const forceKillCommand = process.platform === 'win32' ? 'taskkill /F /IM bun.exe' : 'pkill -9 bun';
-    await new Promise((resolve) => {
-      const { exec } = require('child_process');
-      exec(forceKillCommand, () => resolve(null));
-    });
+    try {
+      // First attempt graceful termination
+      await this.execSecureCommand(commands.graceful[0], commands.graceful[1]);
+      
+      // Give processes time to clean up
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Force kill any remaining processes
+      await this.execSecureCommand(commands.force[0], commands.force[1]);
+      
+    } catch (error) {
+      // Log but don't fail - processes might already be terminated
+      console.warn('Process termination warning:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+}
+
+export async function POST() {
+  try {
+    await SecureProcessManager.terminateProcesses();
 
     return NextResponse.json({ 
       success: true,

@@ -118,29 +118,8 @@ export class QAGeneratorApp {
   private async runInteractiveMode(args: any): Promise<CLIConfig> {
     SecureLogger.info('🎯 Interactive Mode - Let\'s set up your QA generation!');
     
-    // Prompt for missing arguments
-    const mode = args.mode || await CLIPrompts.promptForMode();
-    const region = args.region ? 
-      CLIParser.validateAndConvert({...args, mode, region: args.region}).region :
-      await CLIPrompts.promptForRegion();
-    
-    let count = 1000;
-    if (mode === 'questions' || mode === 'all') {
-      count = args.count ? parseInt(args.count) : await CLIPrompts.promptForCount();
-    }
-    
-    // Build final config with prompts and defaults
-    const finalArgs = {
-      mode,
-      region: region.pinyin,
-      count: count.toString(),
-      workers: args.workers || '5',
-      'max-q-per-worker': args['max-q-per-worker'] || '50',
-      attempts: args.attempts || '3',
-      batch: args.batch || '50',
-      delay: args.delay || '1000',
-      provider: args.provider
-    };
+    const inputs = await this.gatherInteractiveInputs(args);
+    const finalArgs = this.buildFinalArgsFromInteractive(inputs, args);
     
     return CLIParser.validateAndConvert(finalArgs);
   }
@@ -166,6 +145,44 @@ export class QAGeneratorApp {
         delay: cliConfig.delay,
         workerCount: cliConfig.workers
       }
+    };
+  }
+
+  /**
+   * Gather all interactive inputs from user
+   */
+  private async gatherInteractiveInputs(args: any): Promise<{mode: string, region: Region, count: number}> {
+    const mode = args.mode || await CLIPrompts.promptForMode();
+    
+    const region = args.region ? 
+      CLIParser.validateAndConvert({...args, mode, region: args.region}).region :
+      await CLIPrompts.promptForRegion();
+    
+    let count = 1000;
+    if (mode === 'questions' || mode === 'all') {
+      count = args.count ? parseInt(args.count) : await CLIPrompts.promptForCount();
+    }
+    
+    return { mode, region, count };
+  }
+
+  /**
+   * Build final arguments from interactive inputs
+   */
+  private buildFinalArgsFromInteractive(
+    inputs: {mode: string, region: Region, count: number}, 
+    originalArgs: any
+  ): any {
+    return {
+      mode: inputs.mode,
+      region: inputs.region.pinyin,
+      count: inputs.count.toString(),
+      workers: originalArgs.workers || '5',
+      'max-q-per-worker': originalArgs['max-q-per-worker'] || '50',
+      attempts: originalArgs.attempts || '3',
+      batch: originalArgs.batch || '50',
+      delay: originalArgs.delay || '1000',
+      provider: originalArgs.provider
     };
   }
 

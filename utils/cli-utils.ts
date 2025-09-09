@@ -58,48 +58,14 @@ export class CLIParser {
     for (let i = 0; i < this.args.length; i++) {
       const arg = this.args[i];
       
-      // Handle flags without values
-      if (arg === '--help' || arg === '-h') {
-        parsed.help = true;
+      if (this.handleFlagArgument(arg, parsed)) {
         continue;
       }
       
-      if (arg === '--list' || arg === '-l') {
-        parsed.list = true;
-        continue;
-      }
+      const nextArg = this.args[i + 1];
+      const keyValueResult = this.handleKeyValueArgument(arg, nextArg, parsed);
       
-      if (arg === '--version' || arg === '-v') {
-        parsed.version = true;
-        continue;
-      }
-      
-      if (arg === '--interactive' || arg === '-i') {
-        parsed.interactive = true;
-        continue;
-      }
-      
-      // Handle key-value pairs
-      if (arg.startsWith('--')) {
-        const key = arg.slice(2);
-        const value = this.args[i + 1];
-        
-        if (!value || value.startsWith('--')) {
-          throw new ValidationError(`Missing value for argument: --${key}`);
-        }
-        
-        this.setArgValue(parsed, key, value);
-        i++; // Skip the value in next iteration
-      } else if (arg.startsWith('-')) {
-        // Handle short flags with values
-        const key = this.mapShortFlag(arg);
-        const value = this.args[i + 1];
-        
-        if (!value || value.startsWith('-')) {
-          throw new ValidationError(`Missing value for argument: ${arg}`);
-        }
-        
-        this.setArgValue(parsed, key, value);
+      if (keyValueResult.processed) {
         i++; // Skip the value in next iteration
       }
     }
@@ -143,6 +109,79 @@ export class CLIParser {
         // Log unknown argument but don't error to maintain flexibility
         console.warn(`Unknown argument: --${key}`);
     }
+  }
+
+  /**
+   * Handle flag arguments (without values)
+   */
+  private handleFlagArgument(arg: string, parsed: CLIArguments): boolean {
+    const flagMappings = {
+      '--help': 'help', '-h': 'help',
+      '--list': 'list', '-l': 'list',
+      '--version': 'version', '-v': 'version',
+      '--interactive': 'interactive', '-i': 'interactive'
+    };
+    
+    const flagName = flagMappings[arg as keyof typeof flagMappings];
+    if (flagName) {
+      (parsed as any)[flagName] = true;
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Handle key-value arguments
+   */
+  private handleKeyValueArgument(
+    arg: string, 
+    nextArg: string, 
+    parsed: CLIArguments
+  ): {processed: boolean} {
+    if (arg.startsWith('--')) {
+      return this.processLongFlag(arg, nextArg, parsed);
+    } else if (arg.startsWith('-')) {
+      return this.processShortFlag(arg, nextArg, parsed);
+    }
+    
+    return {processed: false};
+  }
+
+  /**
+   * Process long flag (--key value)
+   */
+  private processLongFlag(
+    arg: string, 
+    value: string, 
+    parsed: CLIArguments
+  ): {processed: boolean} {
+    const key = arg.slice(2);
+    
+    if (!value || value.startsWith('--')) {
+      throw new ValidationError(`Missing value for argument: --${key}`);
+    }
+    
+    this.setArgValue(parsed, key, value);
+    return {processed: true};
+  }
+
+  /**
+   * Process short flag (-k value)
+   */
+  private processShortFlag(
+    arg: string, 
+    value: string, 
+    parsed: CLIArguments
+  ): {processed: boolean} {
+    const key = this.mapShortFlag(arg);
+    
+    if (!value || value.startsWith('-')) {
+      throw new ValidationError(`Missing value for argument: ${arg}`);
+    }
+    
+    this.setArgValue(parsed, key, value);
+    return {processed: true};
   }
 
   /**
@@ -325,54 +364,15 @@ export class CLIDisplay {
    * Show help message
    */
   static showHelp(): void {
-    console.log(`
-🤖 QA Generator - AI-powered Question and Answer Generation Tool
-
-USAGE:
-  bun run start [OPTIONS]
-  bun run start --mode <type> --region <name> [OPTIONS]
-
-REQUIRED ARGUMENTS:
-  -m, --mode <type>           Operation mode (questions|answers|all)
-  -r, --region <name>         Region name in pinyin (e.g., "chibi", "changzhou")
-
-OPTIONAL ARGUMENTS:
-  -c, --count <number>        Total questions to generate (default: 1000, max: 10000)
-  -w, --workers <number>      Number of worker threads (default: 5, max: 50)
-      --max-q-per-worker <n>  Maximum questions per worker (default: 50)
-  -a, --attempts <number>     Maximum retry attempts (default: 3, max: 10)
-  -b, --batch <number>        Batch size for processing (default: 50, max: 200)
-  -d, --delay <number>        Delay between batches in ms (default: 1000)
-  -p, --provider <name>       AI provider (qianfan|groq|openai, default: qianfan)
-
-FLAGS:
-  -h, --help                  Show this help message
-  -l, --list                  List available regions
-  -v, --version               Show version information
-  -i, --interactive           Interactive mode for missing arguments
-
-EXAMPLES:
-  # Quick start with interactive mode
-  bun run start --interactive
-
-  # Generate 100 questions for Chibi region
-  bun run start --mode questions --region chibi --count 100
-
-  # Generate answers with 3 workers
-  bun run start -m answers -r chibi -w 3
-
-  # Full workflow with custom settings
-  bun run start -m all -r changzhou -c 500 -w 10 -b 100 -d 2000
-
-  # Use different AI providers
-  bun run start -m questions -r chibi -p groq
-  AI_PROVIDER=openai bun run start -m answers -r chibi
-
-ENVIRONMENT VARIABLES:
-  AI_PROVIDER     Default AI provider (qianfan|groq|openai)
-  
-For provider-specific setup, check the README or provider documentation.
-`);
+    const sections = [
+      this.getHelpHeader(),
+      this.getUsageSection(),
+      this.getArgumentsSection(),
+      this.getExamplesSection(),
+      this.getEnvironmentSection()
+    ];
+    
+    console.log(sections.join('\n'));
   }
 
   /**
@@ -405,6 +405,79 @@ For provider-specific setup, check the README or provider documentation.
     } catch {
       console.log('🤖 QA Generator - Version information not available\n');
     }
+  }
+
+  /**
+   * Get help header section
+   */
+  private static getHelpHeader(): string {
+    return '\n🤖 QA Generator - AI-powered Question and Answer Generation Tool';
+  }
+
+  /**
+   * Get usage section
+   */
+  private static getUsageSection(): string {
+    return `\nUSAGE:
+  bun run start [OPTIONS]
+  bun run start --mode <type> --region <name> [OPTIONS]`;
+  }
+
+  /**
+   * Get arguments section
+   */
+  private static getArgumentsSection(): string {
+    return `\nREQUIRED ARGUMENTS:
+  -m, --mode <type>           Operation mode (questions|answers|all)
+  -r, --region <name>         Region name in pinyin (e.g., "chibi", "changzhou")
+
+OPTIONAL ARGUMENTS:
+  -c, --count <number>        Total questions to generate (default: 1000, max: 10000)
+  -w, --workers <number>      Number of worker threads (default: 5, max: 50)
+      --max-q-per-worker <n>  Maximum questions per worker (default: 50)
+  -a, --attempts <number>     Maximum retry attempts (default: 3, max: 10)
+  -b, --batch <number>        Batch size for processing (default: 50, max: 200)
+  -d, --delay <number>        Delay between batches in ms (default: 1000)
+  -p, --provider <name>       AI provider (qianfan|groq|openai, default: qianfan)
+
+FLAGS:
+  -h, --help                  Show this help message
+  -l, --list                  List available regions
+  -v, --version               Show version information
+  -i, --interactive           Interactive mode for missing arguments`;
+  }
+
+  /**
+   * Get examples section
+   */
+  private static getExamplesSection(): string {
+    return `\nEXAMPLES:
+  # Quick start with interactive mode
+  bun run start --interactive
+
+  # Generate 100 questions for Chibi region
+  bun run start --mode questions --region chibi --count 100
+
+  # Generate answers with 3 workers
+  bun run start -m answers -r chibi -w 3
+
+  # Full workflow with custom settings
+  bun run start -m all -r changzhou -c 500 -w 10 -b 100 -d 2000
+
+  # Use different AI providers
+  bun run start -m questions -r chibi -p groq
+  AI_PROVIDER=openai bun run start -m answers -r chibi`;
+  }
+
+  /**
+   * Get environment variables section
+   */
+  private static getEnvironmentSection(): string {
+    return `\nENVIRONMENT VARIABLES:
+  AI_PROVIDER     Default AI provider (qianfan|groq|openai)
+  
+For provider-specific setup, check the README or provider documentation.
+`;
   }
 
   /**

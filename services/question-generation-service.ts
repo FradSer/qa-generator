@@ -61,78 +61,29 @@ export class QuestionGenerationService {
       const validatedOptions = this.validateOptions(options);
       Logger.process(`Generating questions for ${region.name} (sequential mode)...`);
       
-      // Load existing questions
-      const questionsResult = await this.storageService.loadQuestions(region.pinyin);
-      if (!questionsResult.success) return questionsResult;
+      const loadResult = await this.loadExistingQuestions(region.pinyin);
+      if (!loadResult.success) return loadResult;
       
-      const existingQuestions = questionsResult.data;
-      const initialCount = existingQuestions.length;
+      const { questions: existingQuestions, initialCount } = loadResult.data;
       
-      if (existingQuestions.length >= validatedOptions.count) {
-        Logger.info(`Already have ${existingQuestions.length} questions, target reached`);
-        return Ok({
-          totalGenerated: existingQuestions.length,
-          newQuestions: 0,
-          existingQuestions: existingQuestions.length,
-          targetReached: true,
-          questions: existingQuestions
-        });
+      if (this.isTargetAlreadyReached(existingQuestions.length, validatedOptions.count)) {
+        return Ok(this.createQuestionGenerationResult(existingQuestions, initialCount, validatedOptions.count));
       }
       
-      const existingSet = new Set(existingQuestions.map(q => q.question));
-      let remainingCount = validatedOptions.count - existingQuestions.length;
-      let newQuestionsAdded = 0;
+      const processingResult = await this.processBatchesSequentially(
+        region, 
+        provider, 
+        validatedOptions, 
+        existingQuestions
+      );
       
-      while (remainingCount > 0 && newQuestionsAdded < validatedOptions.count) {
-        const batchSize = Math.min(validatedOptions.batchSize, remainingCount);
-        Logger.process(`Generating batch of ${batchSize} questions...`);
-        
-        const batchResult = await this.generateQuestionBatch(
-          region,
-          provider,
-          batchSize,
-          validatedOptions.maxAttempts,
-          existingSet
-        );
-        
-        if (!batchResult.success) {
-          Logger.error(`Batch generation failed: ${batchResult.error.message}`);
-          break;
-        }
-        
-        const newQuestions = batchResult.data;
-        if (newQuestions.length === 0) {
-          Logger.warn('No new questions generated in this batch, stopping');
-          break;
-        }
-        
-        // Add new questions
-        for (const question of newQuestions) {
-          if (newQuestionsAdded >= remainingCount) break;
-          existingQuestions.push({ ...question, is_answered: false });
-          existingSet.add(question.question);
-          newQuestionsAdded++;
-        }
-        
-        // Save progress
-        const saveResult = await this.storageService.saveQuestions(region.pinyin, existingQuestions);
-        if (!saveResult.success) {
-          Logger.error(`Failed to save progress: ${saveResult.error.message}`);
-        }
-        
-        remainingCount = validatedOptions.count - existingQuestions.length;
-        Logger.info(`Progress: ${existingQuestions.length}/${validatedOptions.count} questions`);
-      }
+      if (!processingResult.success) return processingResult;
       
-      const targetReached = existingQuestions.length >= validatedOptions.count;
-      
-      return Ok({
-        totalGenerated: existingQuestions.length,
-        newQuestions: existingQuestions.length - initialCount,
-        existingQuestions: initialCount,
-        targetReached,
-        questions: existingQuestions
-      });
+      return Ok(this.createQuestionGenerationResult(
+        processingResult.data, 
+        initialCount, 
+        validatedOptions.count
+      ));
       
     } catch (error) {
       return Err(new Error(`Sequential question generation failed: ${error}`));
@@ -151,74 +102,31 @@ export class QuestionGenerationService {
     Logger.process(`Generating questions for ${region.name} using ${validatedOptions.workerCount} workers...`);
     
     const questionPool = new WorkerPool(validatedOptions.workerCount, './workers/question-worker.ts');
-    let retryCount = 0;
     
     try {
-      // Load existing questions
-      const questionsResult = await this.storageService.loadQuestions(region.pinyin);
-      if (!questionsResult.success) return questionsResult;
+      const loadResult = await this.loadExistingQuestions(region.pinyin);
+      if (!loadResult.success) return loadResult;
       
-      let allQuestions = questionsResult.data;
-      const initialCount = allQuestions.length;
-      
+      const { questions: allQuestions, initialCount } = loadResult.data;
       Logger.info(`Starting with ${initialCount} existing questions`);
       
-      // Generate until target reached or max retries exceeded
-      while (allQuestions.length < validatedOptions.count && retryCount < validatedOptions.maxRetries) {
-        if (retryCount > 0) {
-          Logger.process(`Retry ${retryCount}/${validatedOptions.maxRetries}: Current ${allQuestions.length}/${validatedOptions.count}`);
-        }
-        
-        const batchResult = await this.generateParallelBatch(
-          region, 
-          validatedOptions, 
-          allQuestions,
-          questionPool
-        );
-        
-        if (batchResult.success) {
-          const newQuestions = batchResult.data;
-          if (newQuestions.length === 0) {
-            retryCount++;
-            if (retryCount < validatedOptions.maxRetries) {
-              const delayTime = 5000 * retryCount;
-              Logger.process(`No new questions added, waiting ${delayTime/1000}s before retry...`);
-              await new Promise(resolve => setTimeout(resolve, delayTime));
-            }
-            continue;
-          }
-          
-          allQuestions.push(...newQuestions);
-          
-          // Save progress
-          const saveResult = await this.storageService.saveQuestions(region.pinyin, allQuestions);
-          if (!saveResult.success) {
-            Logger.error(`Failed to save progress: ${saveResult.error.message}`);
-          }
-          
-          Logger.success(`Batch complete: ${newQuestions.length} new questions added`);
-          Logger.info(`Progress: ${allQuestions.length}/${validatedOptions.count}`);
-        } else {
-          Logger.error(`Parallel batch failed: ${batchResult.error.message}`);
-          retryCount++;
-        }
-      }
+      const generationResult = await this.executeParallelGenerationLoop(
+        region, 
+        validatedOptions, 
+        allQuestions, 
+        questionPool
+      );
       
-      const targetReached = allQuestions.length >= validatedOptions.count;
+      if (!generationResult.success) return generationResult;
       
-      if (targetReached) {
-        Logger.success(`Target reached: ${allQuestions.length}/${validatedOptions.count} questions`);
-      } else {
-        Logger.warn(`Target not reached: ${allQuestions.length}/${validatedOptions.count} questions after ${retryCount} retries`);
-      }
+      const finalQuestions = generationResult.data;
+      this.logFinalResults(finalQuestions.length, validatedOptions.count, validatedOptions.maxRetries);
       
-      return Ok({
-        totalGenerated: allQuestions.length,
-        newQuestions: allQuestions.length - initialCount,
-        existingQuestions: initialCount,
-        targetReached,
-        questions: allQuestions
-      });
+      return Ok(this.createQuestionGenerationResult(
+        finalQuestions, 
+        initialCount, 
+        validatedOptions.count
+      ));
       
     } catch (error) {
       return Err(new Error(`Parallel question generation failed: ${error}`));
@@ -343,6 +251,121 @@ export class QuestionGenerationService {
   }
 
   /**
+   * Execute the parallel generation loop with retry logic
+   */
+  private async executeParallelGenerationLoop(
+    region: Region,
+    options: QuestionGenerationOptions,
+    allQuestions: Question[],
+    questionPool: WorkerPool
+  ): Promise<Result<Question[], Error>> {
+    let retryCount = 0;
+    
+    while (allQuestions.length < options.count && retryCount < options.maxRetries) {
+      this.logRetryAttempt(retryCount, options.maxRetries, allQuestions.length, options.count);
+      
+      const batchResult = await this.generateParallelBatch(
+        region, 
+        options, 
+        allQuestions,
+        questionPool
+      );
+      
+      const shouldContinue = await this.handleBatchResult(
+        batchResult, 
+        allQuestions, 
+        region.pinyin, 
+        retryCount, 
+        options.maxRetries
+      );
+      
+      if (shouldContinue.shouldRetry) {
+        retryCount++;
+        if (shouldContinue.shouldDelay) {
+          await this.delayBeforeRetry(retryCount);
+        }
+      }
+    }
+    
+    return Ok(allQuestions);
+  }
+
+  /**
+   * Log retry attempt information
+   */
+  private logRetryAttempt(retryCount: number, maxRetries: number, current: number, target: number): void {
+    if (retryCount > 0) {
+      Logger.process(`Retry ${retryCount}/${maxRetries}: Current ${current}/${target}`);
+    }
+  }
+
+  /**
+   * Handle batch result and determine next action
+   */
+  private async handleBatchResult(
+    batchResult: Result<Question[], Error>,
+    allQuestions: Question[],
+    regionPinyin: string,
+    retryCount: number,
+    maxRetries: number
+  ): Promise<{shouldRetry: boolean, shouldDelay: boolean}> {
+    if (batchResult.success) {
+      const newQuestions = batchResult.data;
+      
+      if (newQuestions.length === 0) {
+        return { shouldRetry: retryCount < maxRetries, shouldDelay: retryCount < maxRetries };
+      }
+      
+      allQuestions.push(...newQuestions);
+      await this.saveProgressWithBatchLogging(regionPinyin, allQuestions, newQuestions.length);
+      
+      return { shouldRetry: false, shouldDelay: false };
+    } else {
+      Logger.error(`Parallel batch failed: ${batchResult.error.message}`);
+      return { shouldRetry: true, shouldDelay: false };
+    }
+  }
+
+  /**
+   * Delay before retry with exponential backoff
+   */
+  private async delayBeforeRetry(retryCount: number): Promise<void> {
+    const delayTime = 5000 * retryCount;
+    Logger.process(`No new questions added, waiting ${delayTime/1000}s before retry...`);
+    await new Promise(resolve => setTimeout(resolve, delayTime));
+  }
+
+  /**
+   * Save progress and log batch completion
+   */
+  private async saveProgressWithBatchLogging(
+    regionPinyin: string, 
+    allQuestions: Question[], 
+    newQuestionsCount: number
+  ): Promise<void> {
+    const saveResult = await this.storageService.saveQuestions(regionPinyin, allQuestions);
+    if (!saveResult.success) {
+      Logger.error(`Failed to save progress: ${saveResult.error.message}`);
+    }
+    
+    Logger.success(`Batch complete: ${newQuestionsCount} new questions added`);
+    Logger.info(`Progress: ${allQuestions.length} total questions`);
+  }
+
+  /**
+   * Log final generation results
+   */
+  private logFinalResults(finalCount: number, targetCount: number, maxRetries: number): void {
+    const targetReached = finalCount >= targetCount;
+    
+    if (targetReached) {
+      Logger.success(`Target reached: ${finalCount}/${targetCount} questions`);
+    } else {
+      Logger.warn(`Target not reached: ${finalCount}/${targetCount} questions after ${maxRetries} retries`);
+    }
+  }
+
+  /**
    * Filter questions for uniqueness and similarity
    */
   private filterUniqueQuestions(
@@ -359,16 +382,7 @@ export class QuestionGenerationService {
       
       const questionText = q.question.trim();
       
-      // Check for duplicates
-      if (existingQuestions.has(questionText)) {
-        Logger.debug(`Skipping duplicate: ${questionText.slice(0, 50)}...`);
-        continue;
-      }
-      
-      // Check for similarity
-      const existingArray = Array.from(existingQuestions);
-      if (isTooSimilar(questionText, existingArray, regionName)) {
-        Logger.debug(`Skipping similar: ${questionText.slice(0, 50)}...`);
+      if (this.shouldSkipQuestion(questionText, existingQuestions, regionName)) {
         continue;
       }
       
@@ -379,6 +393,165 @@ export class QuestionGenerationService {
     }
     
     return uniqueQuestions;
+  }
+
+  /**
+   * Determine if a question should be skipped (duplicate or too similar)
+   */
+  private shouldSkipQuestion(
+    questionText: string, 
+    existingQuestions: Set<string>, 
+    regionName: string
+  ): boolean {
+    // Check for duplicates
+    if (existingQuestions.has(questionText)) {
+      Logger.debug(`Skipping duplicate: ${questionText.slice(0, 50)}...`);
+      return true;
+    }
+    
+    // Check for similarity
+    const existingArray = Array.from(existingQuestions);
+    if (isTooSimilar(questionText, existingArray, regionName)) {
+      Logger.debug(`Skipping similar: ${questionText.slice(0, 50)}...`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Load existing questions and return with initial count
+   */
+  private async loadExistingQuestions(regionPinyin: string): Promise<Result<{questions: Question[], initialCount: number}, Error>> {
+    const questionsResult = await this.storageService.loadQuestions(regionPinyin);
+    if (!questionsResult.success) return questionsResult;
+    
+    const existingQuestions = questionsResult.data;
+    return Ok({ questions: existingQuestions, initialCount: existingQuestions.length });
+  }
+
+  /**
+   * Check if target question count is already reached
+   */
+  private isTargetAlreadyReached(currentCount: number, targetCount: number): boolean {
+    if (currentCount >= targetCount) {
+      Logger.info(`Already have ${currentCount} questions, target reached`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Process question generation batches sequentially
+   */
+  private async processBatchesSequentially(
+    region: Region,
+    provider: QuestionProvider,
+    options: QuestionGenerationOptions,
+    existingQuestions: Question[]
+  ): Promise<Result<Question[], Error>> {
+    const existingSet = new Set(existingQuestions.map(q => q.question));
+    let remainingCount = options.count - existingQuestions.length;
+    let newQuestionsAdded = 0;
+    
+    while (remainingCount > 0 && newQuestionsAdded < options.count) {
+      const batchResult = await this.generateAndProcessBatch(
+        region, 
+        provider, 
+        options, 
+        existingSet, 
+        remainingCount, 
+        existingQuestions
+      );
+      
+      if (!batchResult.success) {
+        Logger.error(`Batch generation failed: ${batchResult.error.message}`);
+        break;
+      }
+      
+      const addedCount = batchResult.data;
+      if (addedCount === 0) {
+        Logger.warn('No new questions generated in this batch, stopping');
+        break;
+      }
+      
+      newQuestionsAdded += addedCount;
+      remainingCount = options.count - existingQuestions.length;
+      
+      await this.saveProgressWithLogging(region.pinyin, existingQuestions, options.count);
+    }
+    
+    return Ok(existingQuestions);
+  }
+
+  /**
+   * Generate and process a single batch of questions
+   */
+  private async generateAndProcessBatch(
+    region: Region,
+    provider: QuestionProvider,
+    options: QuestionGenerationOptions,
+    existingSet: Set<string>,
+    remainingCount: number,
+    existingQuestions: Question[]
+  ): Promise<Result<number, Error>> {
+    const batchSize = Math.min(options.batchSize, remainingCount);
+    Logger.process(`Generating batch of ${batchSize} questions...`);
+    
+    const batchResult = await this.generateQuestionBatch(
+      region,
+      provider,
+      batchSize,
+      options.maxAttempts,
+      existingSet
+    );
+    
+    if (!batchResult.success) return batchResult;
+    
+    const newQuestions = batchResult.data;
+    let addedCount = 0;
+    
+    for (const question of newQuestions) {
+      if (addedCount >= remainingCount) break;
+      existingQuestions.push({ ...question, is_answered: false });
+      existingSet.add(question.question);
+      addedCount++;
+    }
+    
+    return Ok(addedCount);
+  }
+
+  /**
+   * Save progress with logging
+   */
+  private async saveProgressWithLogging(
+    regionPinyin: string, 
+    questions: Question[], 
+    targetCount: number
+  ): Promise<void> {
+    const saveResult = await this.storageService.saveQuestions(regionPinyin, questions);
+    if (!saveResult.success) {
+      Logger.error(`Failed to save progress: ${saveResult.error.message}`);
+    }
+    Logger.info(`Progress: ${questions.length}/${targetCount} questions`);
+  }
+
+  /**
+   * Create standardized question generation result
+   */
+  private createQuestionGenerationResult(
+    questions: Question[], 
+    initialCount: number, 
+    targetCount: number
+  ): QuestionGenerationResult {
+    const targetReached = questions.length >= targetCount;
+    return {
+      totalGenerated: questions.length,
+      newQuestions: questions.length - initialCount,
+      existingQuestions: initialCount,
+      targetReached,
+      questions
+    };
   }
 
   /**

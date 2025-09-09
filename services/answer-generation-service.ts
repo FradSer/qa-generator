@@ -60,61 +60,27 @@ export class AnswerGenerationService {
       
       Logger.process(`Generating answers for region: ${validatedPinyin} (sequential mode)...`);
       
-      // Load questions and answers
-      const statusResult = await this.storageService.updateQuestionStatus(validatedPinyin);
-      if (!statusResult.success) return statusResult;
+      const loadResult = await this.loadQuestionsAndAnswers(validatedPinyin);
+      if (!loadResult.success) return loadResult;
       
-      const { questions, answers: existingAnswers } = statusResult.data;
-      const initialAnswerCount = existingAnswers.length;
-      
-      // Get unanswered questions
-      const unansweredQuestions = questions.filter(q => !q.is_answered);
-      Logger.info(`Found ${unansweredQuestions.length} questions without answers`);
+      const { questions, answers: existingAnswers, unanswered: unansweredQuestions, initialCount } = loadResult.data;
       
       if (unansweredQuestions.length === 0) {
-        return this.createResult(questions, existingAnswers, initialAnswerCount);
+        return this.createResult(questions, existingAnswers, initialCount);
       }
       
-      // Generate answers sequentially
-      for (let i = 0; i < unansweredQuestions.length; i++) {
-        const question = unansweredQuestions[i];
-        Logger.process(`Generating answer ${i + 1}/${unansweredQuestions.length}: ${question.question.slice(0, 50)}...`);
-        
-        try {
-          const qaItem = await provider.generateAnswer(question.question, validatedOptions.maxAttempts);
-          
-          if (this.validateQAItem(qaItem)) {
-            existingAnswers.push(qaItem);
-            
-            // Update question status
-            const questionIndex = questions.findIndex(q => q.question === question.question);
-            if (questionIndex !== -1) {
-              questions[questionIndex].is_answered = true;
-            }
-            
-            Logger.success(`Answer generated: ${qaItem.content.slice(0, 100)}...`);
-          } else {
-            Logger.warn('Invalid QA item received, skipping');
-            continue;
-          }
-          
-        } catch (error) {
-          Logger.error(`Failed to generate answer: ${error}`);
-          continue;
-        }
-        
-        // Save progress periodically
-        if (i % 10 === 0 || i === unansweredQuestions.length - 1) {
-          await this.saveProgress(validatedPinyin, questions, existingAnswers);
-        }
-        
-        // Add delay between requests
-        if (validatedOptions.delay > 0 && i < unansweredQuestions.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, validatedOptions.delay));
-        }
-      }
+      const processingResult = await this.processQuestionsSequentially(
+        unansweredQuestions, 
+        provider, 
+        validatedOptions, 
+        questions, 
+        existingAnswers, 
+        validatedPinyin
+      );
       
-      return this.createResult(questions, existingAnswers, initialAnswerCount);
+      if (!processingResult.success) return processingResult;
+      
+      return this.createResult(questions, existingAnswers, initialCount);
       
     } catch (error) {
       return Err(new Error(`Sequential answer generation failed: ${error}`));
@@ -136,74 +102,27 @@ export class AnswerGenerationService {
     const answerPool = new WorkerPool(validatedOptions.workerCount, './workers/answer-worker.ts');
     
     try {
-      // Load questions and answers
-      const statusResult = await this.storageService.updateQuestionStatus(validatedPinyin);
-      if (!statusResult.success) return statusResult;
+      const loadResult = await this.loadQuestionsAndAnswers(validatedPinyin);
+      if (!loadResult.success) return loadResult;
       
-      let { questions, answers: existingAnswers } = statusResult.data;
-      const initialAnswerCount = existingAnswers.length;
-      
-      // Get unanswered questions
-      const unansweredQuestions = questions.filter(q => !q.is_answered);
-      Logger.info(`Found ${unansweredQuestions.length} questions without answers`);
+      const { questions, answers: existingAnswers, unanswered: unansweredQuestions, initialCount } = loadResult.data;
       
       if (unansweredQuestions.length === 0) {
-        return this.createResult(questions, existingAnswers, initialAnswerCount);
+        return this.createResult(questions, existingAnswers, initialCount);
       }
       
-      const answeredQuestions = new Set(existingAnswers.map(item => item.question));
+      const processingResult = await this.processAnswerBatches(
+        unansweredQuestions, 
+        validatedOptions, 
+        questions, 
+        existingAnswers, 
+        validatedPinyin, 
+        answerPool
+      );
       
-      // Calculate batches
-      const batchConfig = this.calculateBatchConfiguration(unansweredQuestions.length, validatedOptions.workerCount);
-      Logger.process(`Processing in ${batchConfig.totalBatches} batches`);
+      if (!processingResult.success) return processingResult;
       
-      // Process in batches
-      for (let batchIndex = 0; batchIndex < batchConfig.totalBatches; batchIndex++) {
-        const batchQuestions = this.getBatchQuestions(unansweredQuestions, batchIndex, batchConfig);
-        
-        Logger.process(`Processing batch ${batchIndex + 1}/${batchConfig.totalBatches} (${batchQuestions.length} questions)`);
-        
-        const batchResult = await this.processBatch(
-          batchQuestions,
-          validatedOptions,
-          answerPool
-        );
-        
-        if (batchResult.success) {
-          const validResults = batchResult.data.filter(this.validateQAItem);
-          Logger.info(`Batch completed: ${validResults.length}/${batchResult.data.length} valid answers`);
-          
-          // Add new answers
-          for (const result of validResults) {
-            if (!answeredQuestions.has(result.question)) {
-              existingAnswers.push(result);
-              answeredQuestions.add(result.question);
-              
-              // Update question status
-              const questionIndex = questions.findIndex(q => q.question === result.question);
-              if (questionIndex !== -1) {
-                questions[questionIndex].is_answered = true;
-              }
-            }
-          }
-          
-          // Save progress after each batch
-          await this.saveProgress(validatedPinyin, questions, existingAnswers);
-          
-          Logger.info(`Progress: ${existingAnswers.length} total answers`);
-          
-        } else {
-          Logger.error(`Batch ${batchIndex + 1} failed: ${batchResult.error.message}`);
-        }
-        
-        // Add delay between batches
-        if (validatedOptions.delay > 0 && batchIndex < batchConfig.totalBatches - 1) {
-          Logger.process(`Waiting ${validatedOptions.delay}ms before next batch...`);
-          await new Promise(resolve => setTimeout(resolve, validatedOptions.delay));
-        }
-      }
-      
-      return this.createResult(questions, existingAnswers, initialAnswerCount);
+      return this.createResult(questions, existingAnswers, initialCount);
       
     } catch (error) {
       return Err(new Error(`Parallel answer generation failed: ${error}`));
@@ -264,6 +183,120 @@ export class AnswerGenerationService {
   }
 
   /**
+   * Process all answer batches with progress tracking
+   */
+  private async processAnswerBatches(
+    unansweredQuestions: Question[],
+    validatedOptions: AnswerGenerationOptions,
+    questions: Question[],
+    existingAnswers: QAItem[],
+    regionPinyin: string,
+    answerPool: WorkerPool
+  ): Promise<Result<void, Error>> {
+    const answeredQuestions = new Set(existingAnswers.map(item => item.question));
+    const batchConfig = this.calculateBatchConfiguration(unansweredQuestions.length, validatedOptions.workerCount);
+    
+    Logger.process(`Processing in ${batchConfig.totalBatches} batches`);
+    
+    for (let batchIndex = 0; batchIndex < batchConfig.totalBatches; batchIndex++) {
+      const batchResult = await this.processSingleAnswerBatch(
+        unansweredQuestions, 
+        batchIndex, 
+        batchConfig, 
+        validatedOptions, 
+        answerPool
+      );
+      
+      if (batchResult.success) {
+        const validResults = batchResult.data.filter(this.validateQAItem);
+        
+        this.updateAnswersAndQuestions(
+          validResults, 
+          answeredQuestions, 
+          existingAnswers, 
+          questions
+        );
+        
+        await this.saveProgressWithBatchLogging(regionPinyin, questions, existingAnswers, validResults.length, batchResult.data.length);
+      } else {
+        Logger.error(`Batch ${batchIndex + 1} failed: ${batchResult.error.message}`);
+      }
+      
+      await this.delayBetweenBatches(validatedOptions.delay, batchIndex, batchConfig.totalBatches);
+    }
+    
+    return Ok(undefined);
+  }
+
+  /**
+   * Process a single batch of questions
+   */
+  private async processSingleAnswerBatch(
+    unansweredQuestions: Question[],
+    batchIndex: number,
+    batchConfig: {totalBatches: number; shouldMergeLastBatch: boolean},
+    options: AnswerGenerationOptions,
+    answerPool: WorkerPool
+  ): Promise<Result<QAItem[], Error>> {
+    const batchQuestions = this.getBatchQuestions(
+      unansweredQuestions, 
+      batchIndex, 
+      {...batchConfig, workerCount: options.workerCount}
+    );
+    
+    Logger.process(`Processing batch ${batchIndex + 1}/${batchConfig.totalBatches} (${batchQuestions.length} questions)`);
+    
+    return await this.processBatch(batchQuestions, options, answerPool);
+  }
+
+  /**
+   * Update answers and question status after batch processing
+   */
+  private updateAnswersAndQuestions(
+    validResults: QAItem[],
+    answeredQuestions: Set<string>,
+    existingAnswers: QAItem[],
+    questions: Question[]
+  ): void {
+    for (const result of validResults) {
+      if (!answeredQuestions.has(result.question)) {
+        existingAnswers.push(result);
+        answeredQuestions.add(result.question);
+        this.updateQuestionStatus(questions, result.question);
+      }
+    }
+  }
+
+  /**
+   * Save progress and log batch results
+   */
+  private async saveProgressWithBatchLogging(
+    regionPinyin: string,
+    questions: Question[],
+    existingAnswers: QAItem[],
+    validCount: number,
+    totalCount: number
+  ): Promise<void> {
+    await this.saveProgress(regionPinyin, questions, existingAnswers);
+    Logger.info(`Batch completed: ${validCount}/${totalCount} valid answers`);
+    Logger.info(`Progress: ${existingAnswers.length} total answers`);
+  }
+
+  /**
+   * Handle delay between batches
+   */
+  private async delayBetweenBatches(
+    delay: number, 
+    currentBatchIndex: number, 
+    totalBatches: number
+  ): Promise<void> {
+    if (delay > 0 && currentBatchIndex < totalBatches - 1) {
+      Logger.process(`Waiting ${delay}ms before next batch...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  /**
    * Get questions for a specific batch
    */
   private getBatchQuestions(
@@ -317,6 +350,130 @@ export class AnswerGenerationService {
       (item as any).question.trim().length > 0 &&
       (item as any).content.trim().length > 0
     );
+  }
+
+  /**
+   * Load questions and answers, return with unanswered questions
+   */
+  private async loadQuestionsAndAnswers(
+    regionPinyin: string
+  ): Promise<Result<{questions: Question[], answers: QAItem[], unanswered: Question[], initialCount: number}, Error>> {
+    const statusResult = await this.storageService.updateQuestionStatus(regionPinyin);
+    if (!statusResult.success) return statusResult;
+    
+    const { questions, answers } = statusResult.data;
+    const initialAnswerCount = answers.length;
+    const unansweredQuestions = questions.filter(q => !q.is_answered);
+    
+    Logger.info(`Found ${unansweredQuestions.length} questions without answers`);
+    
+    return Ok({
+      questions,
+      answers,
+      unanswered: unansweredQuestions,
+      initialCount: initialAnswerCount
+    });
+  }
+
+  /**
+   * Process questions sequentially with progress tracking
+   */
+  private async processQuestionsSequentially(
+    unansweredQuestions: Question[],
+    provider: AnswerProvider,
+    options: AnswerGenerationOptions,
+    questions: Question[],
+    existingAnswers: QAItem[],
+    regionPinyin: string
+  ): Promise<Result<void, Error>> {
+    for (let i = 0; i < unansweredQuestions.length; i++) {
+      const question = unansweredQuestions[i];
+      
+      const answerResult = await this.processSingleQuestion(
+        question, 
+        provider, 
+        options.maxAttempts, 
+        i + 1, 
+        unansweredQuestions.length
+      );
+      
+      if (answerResult.success && answerResult.data) {
+        existingAnswers.push(answerResult.data);
+        this.updateQuestionStatus(questions, question.question);
+      }
+      
+      await this.handleProgressAndDelay(
+        i, 
+        unansweredQuestions.length, 
+        regionPinyin, 
+        questions, 
+        existingAnswers, 
+        options.delay
+      );
+    }
+    
+    return Ok(undefined);
+  }
+
+  /**
+   * Process a single question and generate answer
+   */
+  private async processSingleQuestion(
+    question: Question,
+    provider: AnswerProvider,
+    maxAttempts: number,
+    currentIndex: number,
+    totalQuestions: number
+  ): Promise<Result<QAItem | null, Error>> {
+    Logger.process(`Generating answer ${currentIndex}/${totalQuestions}: ${question.question.slice(0, 50)}...`);
+    
+    try {
+      const qaItem = await provider.generateAnswer(question.question, maxAttempts);
+      
+      if (this.validateQAItem(qaItem)) {
+        Logger.success(`Answer generated: ${qaItem.content.slice(0, 100)}...`);
+        return Ok(qaItem);
+      } else {
+        Logger.warn('Invalid QA item received, skipping');
+        return Ok(null);
+      }
+      
+    } catch (error) {
+      Logger.error(`Failed to generate answer: ${error}`);
+      return Ok(null);
+    }
+  }
+
+  /**
+   * Update question status to answered
+   */
+  private updateQuestionStatus(questions: Question[], questionText: string): void {
+    const questionIndex = questions.findIndex(q => q.question === questionText);
+    if (questionIndex !== -1) {
+      questions[questionIndex].is_answered = true;
+    }
+  }
+
+  /**
+   * Handle progress saving and delays
+   */
+  private async handleProgressAndDelay(
+    currentIndex: number,
+    totalQuestions: number,
+    regionPinyin: string,
+    questions: Question[],
+    answers: QAItem[],
+    delay: number
+  ): Promise<void> {
+    // Save progress periodically
+    if (currentIndex % 10 === 0 || currentIndex === totalQuestions - 1) {
+      await this.saveProgress(regionPinyin, questions, answers);
+    }
+    
+    // Add delay between requests
+    if (delay > 0 && currentIndex < totalQuestions - 1) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 
   /**

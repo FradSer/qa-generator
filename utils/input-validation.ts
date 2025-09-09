@@ -155,6 +155,53 @@ export class InputValidator {
   }
 
   /**
+   * Validate API key format and length
+   */
+  static isValidAPIKey(key: string): boolean {
+    if (typeof key !== 'string') {
+      return false;
+    }
+    
+    // Basic API key validation - must be alphanumeric with common separators
+    const cleanKey = key.trim();
+    if (cleanKey.length < 16 || cleanKey.length > 256) {
+      return false;
+    }
+    
+    // Allow alphanumeric, hyphens, underscores, and dots
+    return /^[a-zA-Z0-9_\-\.]+$/.test(cleanKey);
+  }
+
+  /**
+   * Validate alphanumeric strings (for provider names, etc.)
+   */
+  static isValidAlphanumeric(input: string): boolean {
+    if (typeof input !== 'string') {
+      return false;
+    }
+    
+    const cleaned = input.trim();
+    if (cleaned.length === 0 || cleaned.length > 50) {
+      return false;
+    }
+    
+    return /^[a-zA-Z0-9]+$/.test(cleaned);
+  }
+
+  /**
+   * Validate platform string for secure process management
+   */
+  static validatePlatform(platform: string): 'win32' | 'unix' {
+    const validPlatforms = ['win32', 'darwin', 'linux', 'freebsd', 'openbsd'];
+    
+    if (!validPlatforms.includes(platform)) {
+      throw new ValidationError('Invalid platform detected');
+    }
+    
+    return platform === 'win32' ? 'win32' : 'unix';
+  }
+
+  /**
    * Validate command-line arguments for safe execution
    */
   static validateCommandArgs(args: Record<string, unknown>): Record<string, string> {
@@ -248,6 +295,8 @@ export const ApiValidators = {
     maxAttempts: number;
     batchSize: number;
     delay: number;
+    maxQPerWorker?: number;
+    provider?: string;
   } {
     if (typeof data !== 'object' || data === null) {
       throw new ValidationError('Generate options must be an object');
@@ -255,7 +304,7 @@ export const ApiValidators = {
     
     const obj = data as Record<string, unknown>;
     
-    return {
+    const result = {
       mode: InputValidator.validateMode(typeof obj.mode === 'string' ? obj.mode : ''),
       region: InputValidator.validateRegionPinyin(typeof obj.region === 'string' ? obj.region : ''),
       totalCount: InputValidator.validateNumeric(obj.totalCount, 'totalCount', 1, 10000),
@@ -264,6 +313,23 @@ export const ApiValidators = {
       batchSize: InputValidator.validateNumeric(obj.batchSize, 'batchSize', 1, 1000),
       delay: InputValidator.validateNumeric(obj.delay, 'delay', 0, 60000)
     };
+
+    // Optional fields
+    if (obj.maxQPerWorker !== undefined) {
+      result.maxQPerWorker = InputValidator.validateNumeric(obj.maxQPerWorker, 'maxQPerWorker', 1, 1000);
+    }
+
+    if (typeof obj.provider === 'string' && obj.provider.trim()) {
+      const validProviders = ['qianfan', 'groq', 'openai'];
+      const provider = obj.provider.trim().toLowerCase();
+      if (validProviders.includes(provider)) {
+        result.provider = provider;
+      } else {
+        throw new ValidationError('Provider must be one of: qianfan, groq, openai');
+      }
+    }
+
+    return result;
   }
 };
 
