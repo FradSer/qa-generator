@@ -7,6 +7,7 @@ import { WorkerPool } from '../workers/worker-pool';
 import type { QuestionWorkerTask } from '../types/worker';
 import { isTooSimilar } from '../utils/similarity';
 import { InputValidator, ValidationError } from '../utils/input-validation';
+import { SecureLogger } from '../utils/secure-logger';
 import Logger from '../utils/logger';
 
 /**
@@ -44,9 +45,45 @@ export interface QuestionProvider {
  */
 export class QuestionGenerationService {
   private readonly storageService: StorageService;
+  private readonly memoryMonitor = {
+    lastCheck: Date.now(),
+    peakMemory: 0
+  };
 
   constructor(storageService: StorageService) {
     this.storageService = storageService;
+  }
+  
+  /**
+   * Monitor memory usage during processing
+   */
+  private checkMemoryUsage(): void {
+    const now = Date.now();
+    if (now - this.memoryMonitor.lastCheck > 30000) { // Check every 30 seconds
+      const memUsage = process.memoryUsage();
+      const currentMemMB = Math.round(memUsage.rss / 1024 / 1024);
+      
+      if (currentMemMB > this.memoryMonitor.peakMemory) {
+        this.memoryMonitor.peakMemory = currentMemMB;
+      }
+      
+      if (currentMemMB > 1000) { // Warn if over 1GB
+        SecureLogger.warn('High memory usage detected', {
+          currentMB: currentMemMB,
+          peakMB: this.memoryMonitor.peakMemory,
+          heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+          heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024)
+        });
+        
+        // Force garbage collection if available
+        if (global.gc) {
+          SecureLogger.info('Forcing garbage collection');
+          global.gc();
+        }
+      }
+      
+      this.memoryMonitor.lastCheck = now;
+    }
   }
 
   /**
@@ -177,7 +214,7 @@ export class QuestionGenerationService {
   }
 
   /**
-   * Generate parallel batch using worker pool
+   * Generate parallel batch using worker pool with memory optimization
    */
   private async generateParallelBatch(
     region: Region,
@@ -187,34 +224,69 @@ export class QuestionGenerationService {
   ): Promise<Result<Question[], Error>> {
     
     try {
+      // Use streaming approach for large existing question sets
       const existingSet = new Set(existingQuestions.map(q => q.question));
-      const tasks: Promise<Question[]>[] = [];
-      
-      // Create worker tasks
-      for (let i = 0; i < options.workerCount; i++) {
-        const task: QuestionWorkerTask = {
-          regionName: region.name,
-          batchSize: options.maxQPerWorker,
-          maxAttempts: options.maxAttempts,
-          workerId: i + 1
-        };
-        tasks.push(questionPool.execute(task));
-      }
-      
-      // Wait for all workers
-      const results = await Promise.all(tasks);
-      const allNewQuestions = results.flat();
-      
-      // Filter for unique questions
+      const similarityCache = new Map<string, boolean>();
       const uniqueQuestions: Question[] = [];
-      for (const q of allNewQuestions) {
-        if (!q || typeof q.question !== 'string' || !q.question.trim()) {
-          continue;
+      
+      // Process workers in smaller batches to reduce memory pressure
+      const CONCURRENT_WORKERS = Math.min(options.workerCount, 10);
+      const workerBatches = Math.ceil(options.workerCount / CONCURRENT_WORKERS);
+      
+      for (let batchIndex = 0; batchIndex < workerBatches; batchIndex++) {
+        const batchStart = batchIndex * CONCURRENT_WORKERS;
+        const batchEnd = Math.min(batchStart + CONCURRENT_WORKERS, options.workerCount);
+        const batchTasks: Promise<Question[]>[] = [];
+        
+        // Create tasks for this batch
+        for (let i = batchStart; i < batchEnd; i++) {
+          const task: QuestionWorkerTask = {
+            regionName: region.name,
+            batchSize: options.maxQPerWorker,
+            maxAttempts: options.maxAttempts,
+            workerId: i + 1
+          };
+          batchTasks.push(questionPool.execute(task));
         }
         
-        if (!existingSet.has(q.question) && !isTooSimilar(q.question, Array.from(existingSet), region.name)) {
-          uniqueQuestions.push({ ...q, is_answered: false });
-          existingSet.add(q.question);
+        // Process this batch and immediately filter to save memory
+        const batchResults = await Promise.all(batchTasks);
+        
+        for (const workerResult of batchResults) {
+          for (const question of workerResult) {
+            if (!question?.question?.trim()) continue;
+            
+            const questionText = question.question.trim();
+            if (existingSet.has(questionText)) continue;
+            
+            // Use cached similarity check
+            const cacheKey = `${region.name}:${questionText.slice(0, 50)}`;
+            let isSimilar = similarityCache.get(cacheKey);
+            
+            if (isSimilar === undefined) {
+              isSimilar = isTooSimilar(questionText, Array.from(existingSet), region.name);
+              similarityCache.set(cacheKey, isSimilar);
+              
+              // Limit cache size to prevent memory bloat
+              if (similarityCache.size > 10000) {
+                const firstKey = similarityCache.keys().next().value;
+                similarityCache.delete(firstKey);
+              }
+            }
+            
+            if (!isSimilar) {
+              uniqueQuestions.push({ question: questionText, is_answered: false });
+              existingSet.add(questionText);
+            }
+          }
+        }
+        
+        // Clear processed results to free memory
+        batchResults.length = 0;
+        
+        // Small delay between batches to allow GC
+        if (batchIndex < workerBatches - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
       
@@ -262,6 +334,7 @@ export class QuestionGenerationService {
     let retryCount = 0;
     
     while (allQuestions.length < options.count && retryCount < options.maxRetries) {
+      this.checkMemoryUsage();
       this.logRetryAttempt(retryCount, options.maxRetries, allQuestions.length, options.count);
       
       const batchResult = await this.generateParallelBatch(

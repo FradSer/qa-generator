@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from 'child_process';
+import { NextRequest } from 'next/server';
 import { ApiValidators } from '../../../utils/input-validation';
 import { SecureLogger } from '../../../utils/secure-logger';
+import { APIAuthenticator } from '../../../utils/auth';
 
-export async function POST(request: Request) {
+export const POST = APIAuthenticator.withAuth(async (request: NextRequest) => {
   const encoder = new TextEncoder();
   let options;
   
@@ -61,17 +63,62 @@ export async function POST(request: Request) {
           if (process.env.OPENAI_BASE_URL) secureEnv.OPENAI_BASE_URL = process.env.OPENAI_BASE_URL;
         }
 
-        // Spawn the bun process with controlled environment
-        const childProcess: ChildProcess = spawn('bun', args, {
+        // Additional argument validation to prevent injection
+        const safeArgs = args.filter(arg => {
+          // Only allow known safe patterns
+          return /^[a-zA-Z0-9\-_\.]+$/.test(arg) && !arg.includes('..');
+        });
+        
+        // Verify we have the expected number of arguments
+        if (safeArgs.length !== args.length) {
+          throw new Error('Invalid characters detected in arguments');
+        }
+
+        // Spawn the bun process with enhanced security and resource limits
+        const childProcess: ChildProcess = spawn('bun', safeArgs, {
           env: secureEnv,
-          stdio: ['ignore', 'pipe', 'pipe'], // Secure stdio handling
+          stdio: ['ignore', 'pipe', 'pipe'],
           timeout: 300000, // 5 minute timeout
+          windowsHide: true, // Hide window on Windows
+          // Resource limits (Unix-like systems)
+          ...(process.platform !== 'win32' && {
+            uid: process.getuid?.(), // Run as current user
+            gid: process.getgid?.(),
+          }),
         });
 
-        // Handle process events
+        // Process monitoring and cleanup
+        let isProcessCleanedUp = false;
+        const cleanupProcess = () => {
+          if (!isProcessCleanedUp && childProcess && !childProcess.killed) {
+            isProcessCleanedUp = true;
+            try {
+              childProcess.kill('SIGTERM');
+              setTimeout(() => {
+                if (!childProcess.killed) {
+                  childProcess.kill('SIGKILL');
+                }
+              }, 5000);
+            } catch (error) {
+              SecureLogger.warn('Process cleanup warning', { error: error instanceof Error ? error.message : 'Unknown error' });
+            }
+          }
+        };
+
+        // Set up automatic cleanup after timeout
+        const timeoutHandle = setTimeout(() => {
+          SecureLogger.warn('Process timeout reached, cleaning up');
+          cleanupProcess();
+        }, 300000);
+
+        // Handle process events with enhanced monitoring
         childProcess.stdout?.on('data', (data: Buffer) => {
           try {
             const message = data.toString();
+            // Log large output warnings
+            if (message.length > 10000) {
+              SecureLogger.warn('Large process output detected', { size: message.length });
+            }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', message })}\n\n`));
           } catch (error) {
             // Ignore enqueue errors if the stream is already closed
@@ -89,6 +136,9 @@ export async function POST(request: Request) {
 
         childProcess.on('close', (code: number | null) => {
           try {
+            clearTimeout(timeoutHandle);
+            isProcessCleanedUp = true;
+            SecureLogger.info('Process completed', { code, pid: childProcess.pid });
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end', code })}\n\n`));
             controller.close();
           } catch (error) {
@@ -98,12 +148,21 @@ export async function POST(request: Request) {
 
         childProcess.on('error', (error: Error) => {
           try {
+            clearTimeout(timeoutHandle);
+            cleanupProcess();
+            SecureLogger.error('Process error', { error: error.message, pid: childProcess.pid });
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`));
             controller.close();
           } catch (err) {
             // Ignore enqueue errors if the stream is already closed
           }
         });
+
+        // Handle stream cancellation by client
+        return () => {
+          clearTimeout(timeoutHandle);
+          cleanupProcess();
+        };
       } catch (error) {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Failed to start generation process' })}\n\n`));
@@ -131,4 +190,4 @@ export async function POST(request: Request) {
       'Connection': 'keep-alive',
     },
   });
-} 
+}); 

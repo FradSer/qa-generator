@@ -7,57 +7,135 @@ declare class Worker {
 }
 
 import Logger from '../utils/logger';
+import { SecureLogger } from '../utils/secure-logger';
+
+interface WorkerState {
+  worker: Worker;
+  isAvailable: boolean;
+  taskCount: number;
+  createdAt: number;
+  lastUsed: number;
+}
+
+interface PoolMetrics {
+  tasksCompleted: number;
+  tasksQueued: number;
+  averageTaskTime: number;
+  workerUtilization: number;
+}
 
 /**
- * A simple worker pool implementation for managing multiple worker threads
+ * Enhanced worker pool implementation with performance optimizations and monitoring
  */
 export class WorkerPool {
-  private workers: Worker[];
-  private taskQueue: (() => void)[];
-  private busyWorkers: Set<Worker>;
+  private workerStates: Map<Worker, WorkerState>;
+  private taskQueue: Array<{ task: any; resolve: Function; reject: Function; startTime: number }>;
   private poolId: string;
+  private readonly maxWorkers: number;
+  private metrics: PoolMetrics;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
 
   /**
-   * Creates a new worker pool
+   * Creates a new worker pool with enhanced performance monitoring
    * @param size - Number of workers in the pool
    * @param workerScript - Path to the worker script
    */
   constructor(size: number, workerScript: string) {
-    this.workers = Array.from({ length: size }, () => new Worker(workerScript));
+    this.workerStates = new Map();
     this.taskQueue = [];
-    this.busyWorkers = new Set();
     this.poolId = Math.random().toString(36).substring(7);
-    Logger.info(`Created worker pool with ${size} workers`, '👥');
-
-    // Set up message handlers for each worker
-    this.workers.forEach((worker, index) => {
-      worker.onmessage = (e) => {
-        this.handleWorkerMessage(worker, e.data);
-      };
-      worker.onerror = (e) => {
-        this.handleWorkerError(worker, e);
-      };
-      Logger.debug(`Initialized worker ${index + 1}/${size}`);
+    this.maxWorkers = Math.min(size, 50); // Cap at 50 workers
+    this.metrics = {
+      tasksCompleted: 0,
+      tasksQueued: 0,
+      averageTaskTime: 0,
+      workerUtilization: 0
+    };
+    
+    SecureLogger.info('Creating optimized worker pool', { size: this.maxWorkers, poolId: this.poolId });
+    
+    this.initializeWorkers(workerScript);
+    this.startHealthChecking();
+  }
+  
+  /**
+   * Initialize workers with lazy loading and error handling
+   */
+  private async initializeWorkers(workerScript: string): Promise<void> {
+    const workerPromises = Array.from({ length: this.maxWorkers }, async (_, index) => {
+      try {
+        await this.createWorker(workerScript, index);
+      } catch (error) {
+        SecureLogger.error('Worker creation failed', { index, error: error instanceof Error ? error.message : 'Unknown error' });
+        throw error;
+      }
     });
+    
+    await Promise.allSettled(workerPromises);
+    Logger.info(`Created worker pool with ${this.workerStates.size} workers`, '👥');
+  }
+  
+  /**
+   * Create and configure a single worker
+   */
+  private async createWorker(workerScript: string, index: number): Promise<void> {
+    const worker = new Worker(workerScript);
+    const now = Date.now();
+    
+    const workerState: WorkerState = {
+      worker,
+      isAvailable: true,
+      taskCount: 0,
+      createdAt: now,
+      lastUsed: now
+    };
+    
+    worker.onmessage = (e) => {
+      this.handleWorkerMessage(worker, e.data);
+    };
+    
+    worker.onerror = (e) => {
+      this.handleWorkerError(worker, e, index);
+    };
+    
+    this.workerStates.set(worker, workerState);
+    Logger.debug(`Initialized worker ${index + 1}/${this.maxWorkers}`);
   }
 
   /**
-   * Executes a task using an available worker
+   * Executes a task using an available worker with enhanced performance tracking
    * @param task - Task to be executed
    * @returns Promise that resolves with the task result
    */
   async execute<T>(task: any): Promise<T> {
+    const startTime = Date.now();
+    
     return new Promise((resolve, reject) => {
-      const worker = this.getAvailableWorker();
+      const availableWorker = this.getOptimalWorker();
       
-      if (worker) {
-        this.busyWorkers.add(worker);
-        worker.postMessage(task);
-        Logger.debug(`Assigned task to worker (${this.busyWorkers.size}/${this.workers.length} busy)`);
+      if (availableWorker) {
+        const workerState = this.workerStates.get(availableWorker)!;
+        workerState.isAvailable = false;
+        workerState.taskCount++;
+        workerState.lastUsed = startTime;
+        
+        availableWorker.postMessage(task);
+        this.metrics.tasksQueued--;
+        
+        const busyCount = Array.from(this.workerStates.values()).filter(s => !s.isAvailable).length;
+        Logger.debug(`Assigned task to optimal worker (${busyCount}/${this.workerStates.size} busy)`);
         
         const messageHandler = (e: MessageEvent) => {
-          worker.onmessage = null;
-          this.busyWorkers.delete(worker);
+          availableWorker.onmessage = null;
+          const workerState = this.workerStates.get(availableWorker)!;
+          workerState.isAvailable = true;
+          
+          // Update metrics
+          const taskTime = Date.now() - startTime;
+          this.metrics.tasksCompleted++;
+          this.metrics.averageTaskTime = 
+            (this.metrics.averageTaskTime * (this.metrics.tasksCompleted - 1) + taskTime) / 
+            this.metrics.tasksCompleted;
           Logger.debug(`Task completed (${this.busyWorkers.size}/${this.workers.length} busy)`);
           resolve(e.data as T);
         };
@@ -73,104 +151,198 @@ export class WorkerPool {
         worker.onerror = errorHandler;
       } else {
         // Queue the task if no worker is available
+        this.metrics.tasksQueued++;
         Logger.debug(`No workers available, queuing task (${this.taskQueue.length + 1} tasks queued)`);
-        this.taskQueue.push(() => this.executeTask<T>(task, resolve, reject));
+        this.taskQueue.push({ task, resolve, reject, startTime });
+        this.processTaskQueue();
       }
     });
   }
-
+  
   /**
-   * Executes a task directly without queueing (internal method)
-   * @param task - Task to be executed
-   * @param resolve - Promise resolve callback
-   * @param reject - Promise reject callback
+   * Get the optimal worker based on task count and availability
    */
-  private executeTask<T>(
-    task: any,
-    resolve: (value: T) => void,
-    reject: (reason?: any) => void
-  ): void {
-    const worker = this.getAvailableWorker();
+  private getOptimalWorker(): Worker | null {
+    const availableWorkers = Array.from(this.workerStates.entries())
+      .filter(([_, state]) => state.isAvailable)
+      .sort(([_, a], [__, b]) => a.taskCount - b.taskCount); // Prefer workers with fewer completed tasks
     
-    if (worker) {
-      this.busyWorkers.add(worker);
-      worker.postMessage(task);
-      Logger.debug(`Assigned queued task to worker (${this.busyWorkers.size}/${this.workers.length} busy)`);
+    return availableWorkers.length > 0 ? availableWorkers[0][0] : null;
+  }
+  
+  /**
+   * Process queued tasks when workers become available
+   */
+  private processTaskQueue(): void {
+    while (this.taskQueue.length > 0) {
+      const optimalWorker = this.getOptimalWorker();
+      if (!optimalWorker) break;
+      
+      const queuedTask = this.taskQueue.shift()!;
+      const workerState = this.workerStates.get(optimalWorker)!;
+      
+      workerState.isAvailable = false;
+      workerState.taskCount++;
+      workerState.lastUsed = Date.now();
+      
+      optimalWorker.postMessage(queuedTask.task);
+      this.metrics.tasksQueued--;
       
       const messageHandler = (e: MessageEvent) => {
-        worker.onmessage = null;
-        this.busyWorkers.delete(worker);
-        Logger.debug(`Queued task completed (${this.busyWorkers.size}/${this.workers.length} busy)`);
-        resolve(e.data as T);
+        optimalWorker.onmessage = null;
+        workerState.isAvailable = true;
+        
+        const taskTime = Date.now() - queuedTask.startTime;
+        this.metrics.tasksCompleted++;
+        this.metrics.averageTaskTime = 
+          (this.metrics.averageTaskTime * (this.metrics.tasksCompleted - 1) + taskTime) / 
+          this.metrics.tasksCompleted;
+        
+        queuedTask.resolve(e.data);
+        this.processTaskQueue(); // Process next queued task
       };
       
       const errorHandler = (e: ErrorEvent) => {
-        worker.onerror = null;
-        this.busyWorkers.delete(worker);
-        Logger.error(`Worker error on queued task: ${e.message}`);
-        reject(e);
+        optimalWorker.onerror = null;
+        workerState.isAvailable = true;
+        SecureLogger.error('Queued task worker error', { error: e.message });
+        queuedTask.reject(e);
+        this.processTaskQueue();
       };
       
-      worker.onmessage = messageHandler;
-      worker.onerror = errorHandler;
-    } else {
-      // Worker became unavailable, re-queue the task
-      Logger.debug(`Worker unavailable during queue processing, re-queuing task`);
-      this.taskQueue.unshift(() => this.executeTask<T>(task, resolve, reject));
+      optimalWorker.onmessage = messageHandler;
+      optimalWorker.onerror = errorHandler;
+    }
+  }
+  
+  /**
+   * Start health checking for worker monitoring
+   */
+  private startHealthChecking(): void {
+    this.healthCheckInterval = setInterval(() => {
+      this.performHealthCheck();
+    }, 30000); // Check every 30 seconds
+  }
+  
+  /**
+   * Perform health checks on workers
+   */
+  private performHealthCheck(): void {
+    const now = Date.now();
+    let stuckWorkers = 0;
+    
+    for (const [worker, state] of this.workerStates.entries()) {
+      // Check for stuck workers (busy for more than 2 minutes)
+      if (!state.isAvailable && (now - state.lastUsed) > 120000) {
+        stuckWorkers++;
+        SecureLogger.warn('Potentially stuck worker detected', {
+          taskCount: state.taskCount,
+          lastUsed: state.lastUsed,
+          stuckTime: now - state.lastUsed
+        });
+      }
+    }
+    
+    // Update utilization metrics
+    const busyWorkers = Array.from(this.workerStates.values()).filter(s => !s.isAvailable).length;
+    this.metrics.workerUtilization = (busyWorkers / this.workerStates.size) * 100;
+    
+    if (stuckWorkers > 0) {
+      SecureLogger.warn('Health check summary', {
+        stuckWorkers,
+        totalWorkers: this.workerStates.size,
+        utilization: this.metrics.workerUtilization,
+        queueLength: this.taskQueue.length
+      });
     }
   }
 
-  /**
-   * Gets an available worker from the pool
-   * @returns Available worker or null if none available
-   */
-  private getAvailableWorker(): Worker | null {
-    return this.workers.find(worker => !this.busyWorkers.has(worker)) || null;
-  }
 
   /**
-   * Handles messages from workers
+   * Handles messages from workers with enhanced tracking
    * @param worker - Worker that sent the message
    * @param data - Message data
    */
   private handleWorkerMessage(worker: Worker, data: any) {
-    this.busyWorkers.delete(worker);
-    this.processNextQueuedTask();
-  }
-
-  /**
-   * Process the next task in queue if any
-   */
-  private processNextQueuedTask(): void {
-    if (this.taskQueue.length > 0 && this.getAvailableWorker()) {
-      const nextTask = this.taskQueue.shift();
-      if (nextTask) {
-        Logger.debug(`Processing next queued task (${this.taskQueue.length} remaining)`);
-        try {
-          nextTask();
-        } catch (error) {
-          Logger.error(`Error executing queued task: ${error}`);
-        }
-      }
+    const workerState = this.workerStates.get(worker);
+    if (workerState) {
+      workerState.isAvailable = true;
+      this.processTaskQueue();
     }
   }
 
   /**
-   * Handles worker errors
+   * Handles worker errors with enhanced logging and recovery
    * @param worker - Worker that encountered an error
    * @param error - ErrorEvent
+   * @param index - Worker index for logging
    */
-  private handleWorkerError(worker: Worker, error: ErrorEvent) {
-    Logger.error(`Worker error: ${error.message}`);
-    this.busyWorkers.delete(worker);
-    this.processNextQueuedTask();
+  private handleWorkerError(worker: Worker, error: ErrorEvent, index?: number) {
+    const workerState = this.workerStates.get(worker);
+    if (workerState) {
+      SecureLogger.error('Worker error detected', {
+        index,
+        error: error.message,
+        taskCount: workerState.taskCount,
+        workerAge: Date.now() - workerState.createdAt
+      });
+      
+      workerState.isAvailable = true;
+      this.processTaskQueue();
+      
+      // Consider recreating worker if it has too many errors
+      if (workerState.taskCount > 0) {
+        this.considerWorkerRecreation(worker, index);
+      }
+    }
+  }
+  
+  /**
+   * Consider recreating a problematic worker
+   */
+  private considerWorkerRecreation(worker: Worker, index?: number): void {
+    // Simple heuristic: recreate worker if it's had errors
+    // In a production system, you might track error rates
+    SecureLogger.info('Worker recreation not implemented in this version', { index });
+  }
+  
+  /**
+   * Get pool metrics for monitoring
+   */
+  getMetrics(): PoolMetrics & { poolId: string; workerCount: number; queueLength: number } {
+    return {
+      ...this.metrics,
+      poolId: this.poolId,
+      workerCount: this.workerStates.size,
+      queueLength: this.taskQueue.length
+    };
   }
 
   /**
-   * Terminates all workers in the pool
+   * Terminates all workers in the pool with enhanced cleanup
    */
   terminate() {
-    Logger.info(`Terminating worker pool with ${this.workers.length} workers`);
-    this.workers.forEach(worker => worker.terminate());
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+    
+    SecureLogger.info('Terminating optimized worker pool', {
+      workerCount: this.workerStates.size,
+      metrics: this.getMetrics()
+    });
+    
+    for (const [worker] of this.workerStates.entries()) {
+      try {
+        worker.terminate();
+      } catch (error) {
+        SecureLogger.warn('Worker termination warning', { 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+      }
+    }
+    
+    this.workerStates.clear();
+    this.taskQueue.length = 0;
   }
 } 

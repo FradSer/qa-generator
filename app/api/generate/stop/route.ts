@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { spawn } from 'child_process';
 import { InputValidator } from '../../../../utils/input-validation';
+import { APIAuthenticator } from '../../../../utils/auth';
 
 /**
  * Secure process termination utility
@@ -70,7 +71,7 @@ class SecureProcessManager {
   }
 }
 
-export async function POST() {
+export const POST = APIAuthenticator.withAuth(async (request: NextRequest) => {
   try {
     await SecureProcessManager.terminateProcesses();
 
@@ -88,4 +89,4 @@ export async function POST() {
       { status: 500 }
     );
   }
-} 
+}); 
