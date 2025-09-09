@@ -55,6 +55,65 @@ export class QuestionGenerationService {
   }
   
   /**
+   * Process batch results with memory-efficient filtering
+   */
+  private processBatchResults(
+    batchResults: Question[][],
+    region: Region,
+    existingSet: Set<string>,
+    similarityCache: Map<string, boolean>,
+    uniqueQuestions: Question[]
+  ): void {
+    for (const workerResult of batchResults) {
+      for (const question of workerResult) {
+        const processedQuestion = this.processIndividualQuestion(
+          question,
+          region,
+          existingSet,
+          similarityCache
+        );
+        
+        if (processedQuestion) {
+          uniqueQuestions.push(processedQuestion);
+          existingSet.add(processedQuestion.question);
+        }
+      }
+    }
+  }
+  
+  /**
+   * Process individual question with similarity checking
+   */
+  private processIndividualQuestion(
+    question: Question,
+    region: Region,
+    existingSet: Set<string>,
+    similarityCache: Map<string, boolean>
+  ): Question | null {
+    if (!question?.question?.trim()) return null;
+    
+    const questionText = question.question.trim();
+    if (existingSet.has(questionText)) return null;
+    
+    // Use cached similarity check
+    const cacheKey = `${region.name}:${questionText.slice(0, 50)}`;
+    let isSimilar = similarityCache.get(cacheKey);
+    
+    if (isSimilar === undefined) {
+      isSimilar = isTooSimilar(questionText, Array.from(existingSet), region.name);
+      similarityCache.set(cacheKey, isSimilar);
+      
+      // Limit cache size to prevent memory bloat
+      if (similarityCache.size > 10000) {
+        const firstKey = similarityCache.keys().next().value;
+        if (firstKey) similarityCache.delete(firstKey);
+      }
+    }
+    
+    return isSimilar ? null : { question: questionText, is_answered: false };
+  }
+  
+  /**
    * Monitor memory usage during processing
    */
   private checkMemoryUsage(): void {
@@ -252,34 +311,7 @@ export class QuestionGenerationService {
         // Process this batch and immediately filter to save memory
         const batchResults = await Promise.all(batchTasks);
         
-        for (const workerResult of batchResults) {
-          for (const question of workerResult) {
-            if (!question?.question?.trim()) continue;
-            
-            const questionText = question.question.trim();
-            if (existingSet.has(questionText)) continue;
-            
-            // Use cached similarity check
-            const cacheKey = `${region.name}:${questionText.slice(0, 50)}`;
-            let isSimilar = similarityCache.get(cacheKey);
-            
-            if (isSimilar === undefined) {
-              isSimilar = isTooSimilar(questionText, Array.from(existingSet), region.name);
-              similarityCache.set(cacheKey, isSimilar);
-              
-              // Limit cache size to prevent memory bloat
-              if (similarityCache.size > 10000) {
-                const firstKey = similarityCache.keys().next().value;
-                similarityCache.delete(firstKey);
-              }
-            }
-            
-            if (!isSimilar) {
-              uniqueQuestions.push({ question: questionText, is_answered: false });
-              existingSet.add(questionText);
-            }
-          }
-        }
+        this.processBatchResults(batchResults, region, existingSet, similarityCache, uniqueQuestions);
         
         // Clear processed results to free memory
         batchResults.length = 0;

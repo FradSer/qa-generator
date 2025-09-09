@@ -45,23 +45,8 @@ export const POST = APIAuthenticator.withAuth(async (request: NextRequest) => {
         const validProviders = ['qianfan', 'groq', 'openai'];
         const provider = validProviders.includes(options.provider || '') ? options.provider : 'qianfan';
         
-        // Build secure environment with only necessary variables
-        const secureEnv: Record<string, string> = {
-          NODE_ENV: process.env.NODE_ENV || 'production',
-          PATH: process.env.PATH || '',
-          AI_PROVIDER: provider
-        };
-
-        // Add only relevant API keys based on provider
-        if (provider === 'groq' && process.env.GROQ_API_KEY) {
-          secureEnv.GROQ_API_KEY = process.env.GROQ_API_KEY;
-        } else if (provider === 'qianfan') {
-          if (process.env.QIANFAN_ACCESS_KEY) secureEnv.QIANFAN_ACCESS_KEY = process.env.QIANFAN_ACCESS_KEY;
-          if (process.env.QIANFAN_SECRET_KEY) secureEnv.QIANFAN_SECRET_KEY = process.env.QIANFAN_SECRET_KEY;
-        } else if (provider === 'openai') {
-          if (process.env.OPENAI_API_KEY) secureEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-          if (process.env.OPENAI_BASE_URL) secureEnv.OPENAI_BASE_URL = process.env.OPENAI_BASE_URL;
-        }
+        // Build secure environment with provider-specific configuration
+        const secureEnv = buildSecureEnvironment(provider);
 
         // Additional argument validation to prevent injection
         const safeArgs = args.filter(arg => {
@@ -191,3 +176,30 @@ export const POST = APIAuthenticator.withAuth(async (request: NextRequest) => {
     },
   });
 }); 
+/**
+ * Build secure environment configuration for child process
+ */
+function buildSecureEnvironment(provider: string): Record<string, string> {
+  const baseEnv = {
+    NODE_ENV: process.env.NODE_ENV || 'production',
+    PATH: process.env.PATH || '',
+    AI_PROVIDER: provider
+  };
+
+  // Provider-specific environment variables mapping
+  const providerEnvMap: Record<string, string[]> = {
+    groq: ['GROQ_API_KEY'],
+    qianfan: ['QIANFAN_ACCESS_KEY', 'QIANFAN_SECRET_KEY'],
+    openai: ['OPENAI_API_KEY', 'OPENAI_BASE_URL']
+  };
+
+  const envKeys = providerEnvMap[provider] || [];
+  
+  for (const key of envKeys) {
+    if (process.env[key]) {
+      baseEnv[key] = process.env[key]!;
+    }
+  }
+
+  return baseEnv;
+}

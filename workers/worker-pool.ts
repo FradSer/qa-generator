@@ -54,31 +54,30 @@ export class WorkerPool {
     
     SecureLogger.info('Creating optimized worker pool', { size: this.maxWorkers, poolId: this.poolId });
     
-    this.initializeWorkers(workerScript);
+    // Initialize workers synchronously in constructor
+    this.initializeWorkersSync(workerScript);
     this.startHealthChecking();
   }
   
   /**
-   * Initialize workers with lazy loading and error handling
+   * Initialize workers synchronously in constructor
    */
-  private async initializeWorkers(workerScript: string): Promise<void> {
-    const workerPromises = Array.from({ length: this.maxWorkers }, async (_, index) => {
+  private initializeWorkersSync(workerScript: string): void {
+    for (let index = 0; index < this.maxWorkers; index++) {
       try {
-        await this.createWorker(workerScript, index);
+        this.createWorkerSync(workerScript, index);
       } catch (error) {
         SecureLogger.error('Worker creation failed', { index, error: error instanceof Error ? error.message : 'Unknown error' });
-        throw error;
+        // Continue creating other workers even if one fails
       }
-    });
-    
-    await Promise.allSettled(workerPromises);
+    }
     Logger.info(`Created worker pool with ${this.workerStates.size} workers`, '👥');
   }
   
   /**
-   * Create and configure a single worker
+   * Create and configure a single worker synchronously
    */
-  private async createWorker(workerScript: string, index: number): Promise<void> {
+  private createWorkerSync(workerScript: string, index: number): void {
     const worker = new Worker(workerScript);
     const now = Date.now();
     

@@ -78,36 +78,56 @@ export class APIAuthenticator {
   }
 
   /**
-   * Middleware wrapper for API authentication
+   * Middleware wrapper for API authentication with enhanced error handling
    */
   static withAuth(handler: (request: NextRequest) => Promise<NextResponse>) {
     return async (request: NextRequest): Promise<NextResponse> => {
+      const authResult = this.performAuthentication(request);
+      if (!authResult.success) {
+        return authResult.response;
+      }
+
       try {
-        // Check API key
-        if (!this.validateApiKey(request)) {
-          return NextResponse.json(
-            { error: 'Invalid API key' }, 
-            { status: 401 }
-          );
-        }
-
-        // Check rate limiting
-        if (!this.checkRateLimit(request)) {
-          return NextResponse.json(
-            { error: 'Rate limit exceeded' }, 
-            { status: 429 }
-          );
-        }
-
         return await handler(request);
       } catch (error) {
-        console.error('Authentication error:', error);
+        console.error('Handler error:', error);
         return NextResponse.json(
-          { error: 'Authentication failed' }, 
+          { error: 'Request processing failed' }, 
           { status: 500 }
         );
       }
     };
+  }
+
+  /**
+   * Perform authentication checks and return structured result
+   */
+  private static performAuthentication(request: NextRequest): 
+    { success: true } | { success: false; response: NextResponse } {
+    
+    // Check API key
+    if (!this.validateApiKey(request)) {
+      return {
+        success: false,
+        response: NextResponse.json(
+          { error: 'Invalid API key' }, 
+          { status: 401 }
+        )
+      };
+    }
+
+    // Check rate limiting
+    if (!this.checkRateLimit(request)) {
+      return {
+        success: false,
+        response: NextResponse.json(
+          { error: 'Rate limit exceeded' }, 
+          { status: 429 }
+        )
+      };
+    }
+
+    return { success: true };
   }
 
   /**
