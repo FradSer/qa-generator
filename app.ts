@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 
-import { getRegionByPinyin, type Region } from './config/config';
+import { type Region } from './config/config';
 import { ProviderFactory } from './providers/provider-factory';
 import { StorageService } from './services/storage-service';
 import { QuestionGenerationService, type QuestionGenerationOptions } from './services/question-generation-service';
 import { AnswerGenerationService, type AnswerGenerationOptions } from './services/answer-generation-service';
 import { ProviderAdapter } from './services/provider-adapter';
-import { InputValidator, ValidationError } from './utils/input-validation';
+import { ValidationError } from './utils/input-validation';
 import { SecureLogger, ErrorHandler } from './utils/secure-logger';
+import { CLIParser, CLIPrompts, CLIDisplay, type CLIConfig } from './utils/cli-utils';
 import { isOk } from './types/result';
 import type { AIProviderService } from './types/provider';
 
@@ -40,13 +41,22 @@ export class QAGeneratorApp {
    */
   async run(): Promise<void> {
     try {
-      SecureLogger.info('🚀 QA Generator starting up...');
+      // Parse CLI arguments
+      const cliConfig = await this.parseCLI();
       
-      // Parse and validate configuration
-      const config = await this.parseConfiguration();
+      if (!cliConfig) {
+        // Help, version, or list was shown - exit gracefully
+        return;
+      }
+      
+      SecureLogger.info('🚀 QA Generator starting up...');
+      CLIDisplay.showConfig(cliConfig);
+      
+      // Convert CLI config to app config
+      const config = this.convertToAppConfig(cliConfig);
       
       // Setup AI provider
-      const provider = await this.setupProvider();
+      const provider = await this.setupProvider(cliConfig.provider);
       
       // Execute based on mode
       await this.executeWorkflow(config, provider);
@@ -61,92 +71,114 @@ export class QAGeneratorApp {
   }
 
   /**
-   * Parse and validate command-line configuration
+   * Parse CLI arguments with modern interface
    */
-  private async parseConfiguration(): Promise<AppConfig> {
-    const args = this.parseCommandLineArgs();
-    
+  private async parseCLI(): Promise<CLIConfig | null> {
     try {
-      // Validate all arguments
-      const validatedArgs = InputValidator.validateCommandArgs(args);
+      const parser = new CLIParser();
+      const args = parser.parse();
       
-      // Get and validate region
-      const region = getRegionByPinyin(validatedArgs.region);
-      if (!region) {
-        throw new ValidationError(`Region "${validatedArgs.region}" not found`);
+      // Handle special flags first
+      if (args.help) {
+        CLIDisplay.showHelp();
+        return null;
       }
-
-      // Build configuration
-      const config: AppConfig = {
-        mode: validatedArgs.mode as 'questions' | 'answers' | 'all',
-        region,
-        questionOptions: {
-          count: parseInt(validatedArgs.count || '1000'),
-          maxAttempts: parseInt(validatedArgs.attempts || '3'),
-          batchSize: parseInt(validatedArgs.batch || '50'),
-          workerCount: parseInt(validatedArgs.workers || '5'),
-          maxQPerWorker: parseInt(validatedArgs['max-q-per-worker'] || '50'),
-          maxRetries: 5
-        },
-        answerOptions: {
-          maxAttempts: parseInt(validatedArgs.attempts || '3'),
-          batchSize: parseInt(validatedArgs.batch || '50'),
-          delay: parseInt(validatedArgs.delay || '1000'),
-          workerCount: parseInt(validatedArgs.workers || '5')
-        }
-      };
-
-      SecureLogger.info('📋 Configuration validated:', {
-        mode: config.mode,
-        region: config.region.name,
-        questionTarget: config.questionOptions.count,
-        workers: config.questionOptions.workerCount
-      });
-
-      return config;
+      
+      if (args.version) {
+        CLIDisplay.showVersion();
+        return null;
+      }
+      
+      if (args.list) {
+        CLIDisplay.showRegions();
+        return null;
+      }
+      
+      // Interactive mode for missing arguments
+      if (args.interactive || (!args.mode && !args.region)) {
+        return await this.runInteractiveMode(args);
+      }
+      
+      // Validate and convert arguments
+      return CLIParser.validateAndConvert(args);
       
     } catch (error) {
-      throw ErrorHandler.handleValidation(error, 'command-line arguments');
+      if (error instanceof ValidationError) {
+        SecureLogger.error('❌ CLI Error:', error.message);
+        console.log('\nUse --help for usage information or --interactive for guided setup.');
+        process.exit(1);
+      }
+      throw error;
     }
   }
 
   /**
-   * Parse command-line arguments
+   * Interactive mode for missing arguments
    */
-  private parseCommandLineArgs(): Record<string, string> {
-    const args = process.argv.slice(2);
-    const parsed: Record<string, string> = {};
+  private async runInteractiveMode(args: any): Promise<CLIConfig> {
+    SecureLogger.info('🎯 Interactive Mode - Let\'s set up your QA generation!');
     
-    // Parse --key value pairs
-    for (let i = 0; i < args.length; i += 2) {
-      const key = args[i]?.replace('--', '');
-      const value = args[i + 1];
-      
-      if (!key || !value) {
-        if (key === 'help') {
-          this.showHelp();
-          process.exit(0);
-        }
-        throw new ValidationError(`Missing value for argument: ${key}`);
+    // Prompt for missing arguments
+    const mode = args.mode || await CLIPrompts.promptForMode();
+    const region = args.region ? 
+      CLIParser.validateAndConvert({...args, mode, region: args.region}).region :
+      await CLIPrompts.promptForRegion();
+    
+    let count = 1000;
+    if (mode === 'questions' || mode === 'all') {
+      count = args.count ? parseInt(args.count) : await CLIPrompts.promptForCount();
+    }
+    
+    // Build final config with prompts and defaults
+    const finalArgs = {
+      mode,
+      region: region.pinyin,
+      count: count.toString(),
+      workers: args.workers || '5',
+      'max-q-per-worker': args['max-q-per-worker'] || '50',
+      attempts: args.attempts || '3',
+      batch: args.batch || '50',
+      delay: args.delay || '1000',
+      provider: args.provider
+    };
+    
+    return CLIParser.validateAndConvert(finalArgs);
+  }
+
+  /**
+   * Convert CLI config to app config
+   */
+  private convertToAppConfig(cliConfig: CLIConfig): AppConfig {
+    return {
+      mode: cliConfig.mode,
+      region: cliConfig.region,
+      questionOptions: {
+        count: cliConfig.count,
+        maxAttempts: cliConfig.attempts,
+        batchSize: cliConfig.batch,
+        workerCount: cliConfig.workers,
+        maxQPerWorker: cliConfig.maxQPerWorker,
+        maxRetries: 5
+      },
+      answerOptions: {
+        maxAttempts: cliConfig.attempts,
+        batchSize: cliConfig.batch,
+        delay: cliConfig.delay,
+        workerCount: cliConfig.workers
+      }
+    };
+  }
+
+  /**
+   * Setup AI provider with explicit provider name
+   */
+  private async setupProvider(providerName?: string): Promise<AIProviderService> {
+    try {
+      // Set environment variable if provider specified
+      if (providerName) {
+        process.env.AI_PROVIDER = providerName;
       }
       
-      parsed[key] = value;
-    }
-
-    // Validate required arguments
-    if (!parsed.mode || !parsed.region) {
-      this.showHelp();
-      throw new ValidationError('Missing required arguments: --mode and --region');
-    }
-
-    return parsed;
-  }
-
-  /**
-   * Setup AI provider
-   */
-  private async setupProvider(): Promise<AIProviderService> {
-    try {
       const providerFactory = ProviderFactory.getInstance();
       const result = providerFactory.getDefaultProvider();
       
@@ -156,7 +188,7 @@ export class QAGeneratorApp {
       
       const provider = result.data;
       SecureLogger.info('🤖 AI Provider ready:', {
-        type: process.env.AI_PROVIDER || 'default'
+        type: providerName || process.env.AI_PROVIDER || 'default'
       });
       
       return provider;
@@ -254,45 +286,6 @@ export class QAGeneratorApp {
     });
   }
 
-  /**
-   * Show help message
-   */
-  private showHelp(): void {
-    console.log(`
-🤖 QA Generator - AI-powered Question and Answer Generation Tool
-
-USAGE:
-    bun run app.ts --mode <type> --region <name> [OPTIONS]
-
-REQUIRED ARGUMENTS:
-    --mode <type>       Operation mode (questions|answers|all)
-    --region <name>     Region name in pinyin (e.g., "chibi", "changzhou")
-
-OPTIONAL ARGUMENTS:
-    --count <number>            Total questions to generate (default: 1000)
-    --workers <number>          Number of worker threads (default: 5)
-    --max-q-per-worker <number> Maximum questions per worker (default: 50)
-    --attempts <number>         Maximum retry attempts (default: 3)
-    --batch <number>            Batch size for processing (default: 50)
-    --delay <number>            Delay between batches in ms (default: 1000)
-    --help                      Show this help message
-
-EXAMPLES:
-    # Generate 100 questions for Chibi region
-    bun run app.ts --mode questions --region chibi --count 100
-    
-    # Generate answers for existing questions
-    bun run app.ts --mode answers --region chibi --workers 3
-    
-    # Full workflow: questions + answers
-    bun run app.ts --mode all --region chibi --count 500 --workers 10
-
-ENVIRONMENT VARIABLES:
-    AI_PROVIDER    AI provider to use (qianfan|groq|openai, default: qianfan)
-    
-For provider-specific setup, check the README or provider documentation.
-`);
-  }
 }
 
 /**
