@@ -16,7 +16,7 @@ import uuid
 import os
 
 # 导入我们的知识蒸馏模块
-from distillation import (
+from backend.distillation import (
     create_distillation_system,
     DistillationConfig,
     GenerationRequest as DistillationRequest,

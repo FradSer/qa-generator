@@ -25,7 +25,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
 COPY backend/ ./backend/
-COPY distillation/ ./distillation/
 
 # 创建必要的目录
 RUN mkdir -p backend/logs backend/uploads backend/exports backend/config
