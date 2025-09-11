@@ -73,7 +73,6 @@ services:
     volumes:
       # 挂载源码以支持热重载
       - ./backend:/app/backend
-      - ./distillation:/app/distillation
       - ./config:/app/backend/config:ro
       - ./logs:/app/backend/logs
       - backend_dev_uploads:/app/backend/uploads
@@ -88,13 +87,40 @@ services:
     networks:
       - qa-generator-dev-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  # Next.js 前端服务 (开发模式)
+  # 主页服务 (开发模式)
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile.dev
+    container_name: qa-generator-landing-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      # 开发模式下允许快速刷新
+      FAST_REFRESH: true
+    volumes:
+      # 挂载源码以支持热重载
+      - ./landing:/app
+      - /app/node_modules  # 防止本地node_modules覆盖容器内的
+      - /app/.next  # 防止本地.next覆盖容器内的
+    ports:
+      - "3001:3001"
+    networks:
+      - qa-generator-dev-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # 前端应用服务 (开发模式)
   frontend:
     build:
       context: ./frontend

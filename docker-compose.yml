@@ -94,7 +94,29 @@ services:
       retries: 3
       start_period: 40s
 
-  # Next.js 前端服务
+  # 主页服务 (Landing Page)
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    container_name: qa-generator-landing
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "3001:3001"
+    networks:
+      - qa-generator-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 前端应用服务 (Frontend)
   frontend:
     build:
       context: ./frontend
@@ -113,7 +135,7 @@ services:
     networks:
       - qa-generator-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -132,6 +154,7 @@ services:
       - "443:443"
     depends_on:
       - backend
+      - landing
       - frontend
     networks:
       - qa-generator-network
