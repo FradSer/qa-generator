@@ -25,9 +25,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
 COPY backend/ ./backend/
+COPY shared/ ./shared/
 
 # 创建必要的目录
 RUN mkdir -p backend/logs backend/uploads backend/exports backend/config
+
+# 设置Python路径包含shared目录
+ENV PYTHONPATH=/app:/app/shared
 
 # 暴露端口
 EXPOSE 8000

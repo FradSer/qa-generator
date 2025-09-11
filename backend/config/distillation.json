@@ -1,0 +1,79 @@
+{
+  "teacher_models": [
+    {
+      "name": "gpt4_teacher",
+      "provider_type": "openai",
+      "config": {
+        "api_key": "${OPENAI_API_KEY}",
+        "base_url": "https://api.openai.com/v1",
+        "model_name": "gpt-4o",
+        "max_tokens": 2000,
+        "temperature": 0.8,
+        "timeout": 30,
+        "rate_limit_per_minute": 30
+      }
+    },
+    {
+      "name": "claude_teacher",
+      "provider_type": "anthropic",
+      "config": {
+        "api_key": "${ANTHROPIC_API_KEY}",
+        "base_url": "https://api.anthropic.com",
+        "model_name": "claude-3.5-sonnet",
+        "max_tokens": 4000,
+        "temperature": 0.7,
+        "timeout": 30,
+        "rate_limit_per_minute": 25
+      }
+    },
+    {
+      "name": "gemini_teacher",
+      "provider_type": "google",
+      "config": {
+        "api_key": "${GOOGLE_API_KEY}",
+        "base_url": "https://generativelanguage.googleapis.com",
+        "model_name": "gemini-pro",
+        "max_tokens": 3000,
+        "temperature": 0.8,
+        "timeout": 30,
+        "rate_limit_per_minute": 40
+      }
+    }
+  ],
+  "student_models": [
+    {
+      "name": "gpt35_student",
+      "provider_type": "openai",
+      "config": {
+        "api_key": "${OPENAI_API_KEY}",
+        "base_url": "https://api.openai.com/v1",
+        "model_name": "gpt-3.5-turbo",
+        "max_tokens": 1000,
+        "temperature": 0.7,
+        "timeout": 30,
+        "rate_limit_per_minute": 60
+      }
+    },
+    {
+      "name": "claude_haiku_student",
+      "provider_type": "anthropic",
+      "config": {
+        "api_key": "${ANTHROPIC_API_KEY}",
+        "base_url": "https://api.anthropic.com",
+        "model_name": "claude-3-haiku",
+        "max_tokens": 2000,
+        "temperature": 0.7,
+        "timeout": 30,
+        "rate_limit_per_minute": 80
+      }
+    }
+  ],
+  "strategy": "response_based",
+  "quality_threshold": 0.8,
+  "cost_optimization": true,
+  "adaptive_learning": true,
+  "cache_patterns": true,
+  "max_teacher_examples": 50,
+  "student_batch_size": 20,
+  "validation_sample_ratio": 0.1
+}

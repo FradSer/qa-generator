@@ -50,6 +50,8 @@ services:
       dockerfile: ./backend/Dockerfile.dev
     container_name: qa-generator-backend-dev
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       # 数据库配置
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password123}@postgres:5432/qa_generator
@@ -57,23 +59,22 @@ services:
       # Redis配置
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
       
-      # LLM API Keys
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
-      
       # 应用配置
       DEBUG: true
       HOST: 0.0.0.0
       PORT: 8000
       LOG_LEVEL: DEBUG
       
-      # 安全配置
-      SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+      # 蒸馏配置路径
+      DISTILLATION_CONFIG: /app/backend/config/distillation.json
+      
+      # Python路径
+      PYTHONPATH: /app:/app/shared
     volumes:
       # 挂载源码以支持热重载
       - ./backend:/app/backend
-      - ./config:/app/backend/config:ro
+      - ./shared:/app/shared:ro
+      - ./backend/config:/app/backend/config:ro
       - ./logs:/app/backend/logs
       - backend_dev_uploads:/app/backend/uploads
       - backend_dev_exports:/app/backend/exports
@@ -100,6 +101,8 @@ services:
       dockerfile: Dockerfile.dev
     container_name: qa-generator-landing-dev
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       NODE_ENV: development
       # 开发模式下允许快速刷新
@@ -127,6 +130,8 @@ services:
       dockerfile: Dockerfile.dev
     container_name: qa-generator-frontend-dev
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
@@ -135,6 +140,7 @@ services:
     volumes:
       # 挂载源码以支持热重载
       - ./frontend:/app
+      - ./shared:/app/shared:ro
       - /app/node_modules  # 防止本地node_modules覆盖容器内的
       - /app/.next  # 防止本地.next覆盖容器内的
     ports:
