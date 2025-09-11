@@ -1,0 +1,285 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-feature-settings: 'cv11', 'ss01';
+    font-variation-settings: 'opsz' 32;
+  }
+  
+  body {
+    @apply text-gray-900 bg-white;
+  }
+  
+  * {
+    @apply border-gray-200;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 text-white;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 focus:ring-gray-500 text-gray-900;
+  }
+  
+  .btn-danger {
+    @apply bg-error-600 hover:bg-error-700 focus:ring-error-500 text-white;
+  }
+  
+  .btn-success {
+    @apply bg-success-600 hover:bg-success-700 focus:ring-success-500 text-white;
+  }
+  
+  .btn-outline {
+    @apply border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary-500;
+  }
+  
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  
+  .btn-disabled {
+    @apply opacity-50 cursor-not-allowed pointer-events-none;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-soft border border-gray-200;
+  }
+  
+  .card-header {
+    @apply px-6 py-4 border-b border-gray-200;
+  }
+  
+  .card-body {
+    @apply px-6 py-4;
+  }
+  
+  .card-footer {
+    @apply px-6 py-4 border-t border-gray-200 bg-gray-50;
+  }
+  
+  .form-input {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm;
+  }
+  
+  .form-textarea {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm;
+  }
+  
+  .form-select {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm;
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  
+  .form-error {
+    @apply text-sm text-error-600 mt-1;
+  }
+  
+  .form-help {
+    @apply text-sm text-gray-500 mt-1;
+  }
+  
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-primary {
+    @apply bg-primary-100 text-primary-800;
+  }
+  
+  .badge-secondary {
+    @apply bg-gray-100 text-gray-800;
+  }
+  
+  .badge-success {
+    @apply bg-success-100 text-success-800;
+  }
+  
+  .badge-warning {
+    @apply bg-warning-100 text-warning-800;
+  }
+  
+  .badge-error {
+    @apply bg-error-100 text-error-800;
+  }
+  
+  .progress {
+    @apply w-full bg-gray-200 rounded-full h-2;
+  }
+  
+  .progress-bar {
+    @apply bg-primary-600 h-2 rounded-full transition-all duration-300 ease-in-out;
+  }
+  
+  .loading-spinner {
+    @apply animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600;
+  }
+  
+  .loading-dots::after {
+    content: '';
+    animation: loading-dots 1.5s infinite;
+  }
+  
+  .sidebar-nav {
+    @apply space-y-1;
+  }
+  
+  .sidebar-nav-item {
+    @apply group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-150;
+  }
+  
+  .sidebar-nav-item.active {
+    @apply bg-primary-100 text-primary-700 border-r-4 border-primary-600;
+  }
+  
+  .sidebar-nav-item:hover {
+    @apply bg-gray-100 text-gray-900;
+  }
+  
+  .table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+  
+  .table thead {
+    @apply bg-gray-50;
+  }
+  
+  .table th {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+  
+  .table td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+  }
+  
+  .table tbody tr {
+    @apply hover:bg-gray-50 transition-colors duration-150;
+  }
+  
+  .table tbody tr:nth-child(even) {
+    @apply bg-gray-50;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent;
+  }
+  
+  .bg-gradient-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-700;
+  }
+  
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm;
+  }
+  
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+  }
+  
+  .animate-fade-in {
+    @apply animate-fade-in;
+  }
+  
+  .animate-slide-up {
+    @apply animate-slide-up;
+  }
+  
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 自定义动画 */
+@keyframes loading-dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+
+/* 响应式设计调整 */
+@media (max-width: 640px) {
+  .card {
+    @apply rounded-none border-x-0;
+  }
+  
+  .card-body {
+    @apply px-4 py-3;
+  }
+  
+  .btn {
+    @apply w-full justify-center;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .dark-mode body {
+    @apply bg-gray-900 text-gray-100;
+  }
+  
+  .dark-mode .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark-mode .btn-outline {
+    @apply border-gray-600 text-gray-300 bg-gray-800 hover:bg-gray-700;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .card {
+    @apply shadow-none border border-gray-300;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .btn-primary {
+    @apply bg-blue-700 border-blue-800;
+  }
+  
+  .form-input {
+    @apply border-2 border-gray-400;
+  }
+}
+
+/* 减少动画模式 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "qa-generator-frontend",
+  "version": "1.0.0",
+  "description": "AI微调数据集生成器 - 前端界面",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/uuid": "^9.0.7",
+    "autoprefixer": "^10.4.16",
+    "axios": "^1.5.0",
+    "clsx": "^2.0.0",
+    "date-fns": "^2.30.0",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.292.0",
+    "next": "14.0.0",
+    "node-fetch": "^3.3.2",
+    "postcss": "^8.4.31",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.2.3",
+    "react-hook-form": "^7.47.0",
+    "react-hot-toast": "^2.4.1",
+    "react-query": "^3.39.0",
+    "recharts": "^2.8.0",
+    "tailwind-merge": "^2.0.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5.2.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "eslint": "^8.52.0",
+    "eslint-config-next": "14.0.0",
+    "prettier": "^3.0.0",
+    "prettier-plugin-tailwindcss": "^0.5.6"
+  }
+}

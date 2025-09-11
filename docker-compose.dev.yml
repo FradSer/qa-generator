@@ -1,0 +1,149 @@
+# 开发环境 Docker Compose 配置
+# 使用方法: docker-compose -f docker-compose.dev.yml up -d
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: qa-generator-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qa_generator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - qa-generator-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: qa-generator-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - qa-generator-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # FastAPI 后端服务 (开发模式)
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile.dev
+    container_name: qa-generator-backend-dev
+    restart: unless-stopped
+    environment:
+      # 数据库配置
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password123}@postgres:5432/qa_generator
+      
+      # Redis配置
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      
+      # LLM API Keys
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      
+      # 应用配置
+      DEBUG: true
+      HOST: 0.0.0.0
+      PORT: 8000
+      LOG_LEVEL: DEBUG
+      
+      # 安全配置
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+    volumes:
+      # 挂载源码以支持热重载
+      - ./backend:/app/backend
+      - ./distillation:/app/distillation
+      - ./config:/app/backend/config:ro
+      - ./logs:/app/backend/logs
+      - backend_dev_uploads:/app/backend/uploads
+      - backend_dev_exports:/app/backend/exports
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - qa-generator-dev-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Next.js 前端服务 (开发模式)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: qa-generator-frontend-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      # 开发模式下允许快速刷新
+      FAST_REFRESH: true
+    volumes:
+      # 挂载源码以支持热重载
+      - ./frontend:/app
+      - /app/node_modules  # 防止本地node_modules覆盖容器内的
+      - /app/.next  # 防止本地.next覆盖容器内的
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - qa-generator-dev-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# 网络配置
+networks:
+  qa-generator-dev-network:
+    driver: bridge
+    name: qa-generator-dev-network
+
+# 数据卷配置 (开发环境)
+volumes:
+  postgres_dev_data:
+    name: qa-generator-postgres-dev-data
+    driver: local
+  
+  redis_dev_data:
+    name: qa-generator-redis-dev-data
+    driver: local
+    
+  backend_dev_uploads:
+    name: qa-generator-backend-dev-uploads
+    driver: local
+    
+  backend_dev_exports:
+    name: qa-generator-backend-dev-exports
+    driver: local

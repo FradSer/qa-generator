@@ -1,0 +1,38 @@
+# 开发模式 Dockerfile - 支持热重载
+FROM python:3.11-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 设置环境变量
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# 复制requirements文件
+COPY backend/requirements.txt .
+
+# 安装Python依赖
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制项目文件
+COPY backend/ ./backend/
+COPY distillation/ ./distillation/
+
+# 创建必要的目录
+RUN mkdir -p backend/logs backend/uploads backend/exports backend/config
+
+# 暴露端口
+EXPOSE 8000
+
+# 开发模式启动命令（热重载）
+WORKDIR /app
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

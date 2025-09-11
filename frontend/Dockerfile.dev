@@ -1,0 +1,19 @@
+# 开发模式 Dockerfile - 支持热重载
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 复制package文件
+COPY package*.json ./
+
+# 安装所有依赖（包括开发依赖）
+RUN npm install
+
+# 暴露端口
+EXPOSE 3000
+
+# 设置环境变量
+ENV NODE_ENV=development
+
+# 启动开发服务器
+CMD ["npm", "run", "dev"]
