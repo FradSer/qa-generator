@@ -130,6 +130,33 @@
     @apply animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600;
   }
   
+  .slider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+  }
+  
+  .slider::-webkit-slider-track {
+    @apply bg-gray-200 h-2 rounded-lg;
+  }
+  
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    @apply h-5 w-5 rounded-full bg-blue-600 cursor-pointer border-0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
+  .slider::-moz-range-track {
+    @apply bg-gray-200 h-2 rounded-lg border-0;
+  }
+  
+  .slider::-moz-range-thumb {
+    @apply h-5 w-5 rounded-full bg-blue-600 cursor-pointer border-0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
   .loading-dots::after {
     content: '';
     animation: loading-dots 1.5s infinite;
