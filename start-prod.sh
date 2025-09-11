@@ -101,7 +101,7 @@ health_check() {
     
     # 检查后端服务
     while [ $attempt -lt $max_attempts ]; do
-        if curl -f -s http://localhost:8000/health > /dev/null 2>&1; then
+        if curl -f -s http://localhost:8000/api/health > /dev/null 2>&1; then
             print_message $GREEN "✅ 后端服务健康"
             break
         fi
@@ -141,7 +141,8 @@ show_status() {
     docker-compose ps
     
     print_message $BLUE "\n🌐 生产环境访问地址:"
-    print_message $GREEN "前端界面: http://localhost:3000"
+    print_message $GREEN "主页 (营销页面): http://localhost:3001"
+    print_message $GREEN "前端应用: http://localhost:3000"
     print_message $GREEN "后端API: http://localhost:8000"
     print_message $GREEN "API文档: http://localhost:8000/docs"
     

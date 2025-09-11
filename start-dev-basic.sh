@@ -31,10 +31,26 @@ fi
 # 检查.env文件
 if [ ! -f ".env" ]; then
     print_message $YELLOW "📝 创建基础.env文件..."
-    cp .env.development .env || {
-        print_message $RED "❌ 无法创建.env文件"
-        exit 1
-    }
+    if [ -f ".env.example" ]; then
+        cp .env.example .env
+        print_message $GREEN "✅ 已从.env.example创建.env文件"
+    else
+        print_message $YELLOW "📝 创建基础.env文件..."
+        cat > .env << 'EOF'
+# 数据库配置
+POSTGRES_PASSWORD=password123
+REDIS_PASSWORD=redis123
+
+# LLM API Keys (请替换为您的实际API密钥)
+OPENAI_API_KEY=sk-your-openai-api-key
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-api-key
+GOOGLE_API_KEY=your-google-api-key
+
+# 应用配置
+SECRET_KEY=dev-secret-key-change-in-production
+EOF
+        print_message $GREEN "✅ 已创建基础.env文件"
+    fi
 fi
 
 # 停止现有服务

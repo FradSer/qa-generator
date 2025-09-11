@@ -103,7 +103,7 @@ start_dev_services() {
     
     print_message $BLUE "🐳 构建并启动应用服务..."
     # 尝试构建和启动应用服务，如果网络有问题则提供替代方案
-    if ! timeout 180 docker-compose -f docker-compose.dev.yml up -d --build backend frontend; then
+    if ! timeout 180 docker-compose -f docker-compose.dev.yml up -d --build backend landing frontend; then
         print_message $YELLOW "⚠️  Docker Hub连接可能有问题，尝试仅启动基础服务..."
         print_message $YELLOW "您可以稍后在网络恢复后运行以下命令启动完整服务："
         print_message $BLUE "docker-compose -f docker-compose.dev.yml up -d --build"
@@ -183,14 +183,15 @@ show_status() {
     docker-compose -f docker-compose.dev.yml ps
     
     print_message $BLUE "\n🌐 开发环境访问地址:"
-    print_message $GREEN "前端界面 (热重载): http://localhost:3000"
+    print_message $GREEN "主页 (营销页面): http://localhost:3001"
+    print_message $GREEN "前端应用 (热重载): http://localhost:3000"
     print_message $GREEN "后端API (热重载): http://localhost:8000"
     print_message $GREEN "API文档: http://localhost:8000/docs"
     print_message $GREEN "数据库: localhost:5432"
     print_message $GREEN "Redis: localhost:6379"
     
     print_message $BLUE "\n📝 开发提示:"
-    print_message $YELLOW "• 前端代码修改会自动热重载"
+    print_message $YELLOW "• 主页和应用代码修改会自动热重载"
     print_message $YELLOW "• 后端代码修改会自动重启服务"
     print_message $YELLOW "• 查看日志: docker-compose -f docker-compose.dev.yml logs -f"
     print_message $YELLOW "• 停止服务: ./stop-dev.sh 或 docker-compose -f docker-compose.dev.yml down"
