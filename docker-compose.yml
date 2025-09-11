@@ -1,120 +1,262 @@
-version: '3.8'
+# 生产环境 Docker Compose 配置
+# 使用方法: docker-compose up -d
 
 services:
-  qa-generator:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        NODE_ENV: production
-    image: qa-generator:latest
-    container_name: qa-generator-app
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: qa-generator-postgres
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - QA_GENERATOR_API_KEY=${QA_GENERATOR_API_KEY}
-      - AI_PROVIDER=${AI_PROVIDER:-qianfan}
-      - QIANFAN_ACCESS_KEY=${QIANFAN_ACCESS_KEY}
-      - QIANFAN_SECRET_KEY=${QIANFAN_SECRET_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
-      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-30}
-      - MAX_MEMORY_MB=${MAX_MEMORY_MB:-2048}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - REDIS_URL=redis://redis:6379
+      POSTGRES_DB: qa_generator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     volumes:
-      - qa_data:/app/data
-      - qa_logs:/app/logs
-    depends_on:
-      - redis
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
     networks:
-      - qa_network
+      - qa-generator-network
     healthcheck:
-      test: ["CMD", "/usr/local/bin/docker-healthcheck.sh"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          memory: ${MAX_MEMORY_MB:-2048}M
-        reservations:
-          memory: 512M
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Redis 缓存
   redis:
     image: redis:7-alpine
     container_name: qa-generator-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
     networks:
-      - qa_network
+      - qa-generator-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
+  # FastAPI 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qa-generator-backend
+    restart: unless-stopped
+    environment:
+      # 数据库配置
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password123}@postgres:5432/qa_generator
+      
+      # Redis配置
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      
+      # LLM API Keys
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      
+      # 应用配置
+      DEBUG: ${DEBUG:-false}
+      HOST: 0.0.0.0
+      PORT: 8000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # 安全配置
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      
+      # 知识蒸馏配置
+      DISTILLATION_CONFIG_PATH: /app/config/distillation.json
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - backend_uploads:/app/uploads
+      - backend_exports:/app/exports
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - qa-generator-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Next.js 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    container_name: qa-generator-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - qa-generator-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx 反向代理 (可选)
   nginx:
     image: nginx:alpine
     container_name: qa-generator-nginx
     restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     ports:
       - "80:80"
       - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-      - qa_logs:/var/log/nginx
     depends_on:
-      - qa-generator
+      - backend
+      - frontend
     networks:
-      - qa_network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      - qa-generator-network
+    profiles:
+      - production
 
-  monitoring:
+  # 监控服务 - Prometheus (可选)
+  prometheus:
     image: prom/prometheus:latest
-    container_name: qa-generator-monitoring
+    container_name: qa-generator-prometheus
     restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     ports:
       - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    networks:
-      - qa_network
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+    networks:
+      - qa-generator-network
+    profiles:
+      - monitoring
 
-volumes:
-  qa_data:
-    driver: local
-  qa_logs:
-    driver: local
-  redis_data:
-    driver: local
-  prometheus_data:
-    driver: local
+  # 监控服务 - Grafana (可选)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: qa-generator-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_SECURITY_ADMIN_USER: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - qa-generator-network
+    profiles:
+      - monitoring
 
+  # 任务队列处理器 (可选)
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qa-generator-celery
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password123}@postgres:5432/qa_generator
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+    command: celery -A app.celery worker --loglevel=info
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - qa-generator-network
+    profiles:
+      - background-tasks
+
+  # 任务监控 - Flower (可选)
+  celery-flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qa-generator-flower
+    restart: unless-stopped
+    environment:
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+    command: celery -A app.celery flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - qa-generator-network
+    profiles:
+      - background-tasks
+
+# 网络配置
 networks:
-  qa_network:
+  qa-generator-network:
     driver: bridge
+    name: qa-generator-network
+
+# 数据卷配置
+volumes:
+  postgres_data:
+    name: qa-generator-postgres-data
+    driver: local
+  
+  redis_data:
+    name: qa-generator-redis-data
+    driver: local
+    
+  prometheus_data:
+    name: qa-generator-prometheus-data
+    driver: local
+    
+  grafana_data:
+    name: qa-generator-grafana-data
+    driver: local
+    
+  backend_uploads:
+    name: qa-generator-backend-uploads
+    driver: local
+    
+  backend_exports:
+    name: qa-generator-backend-exports
+    driver: local
