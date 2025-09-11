@@ -22,7 +22,16 @@ This is a full-stack application with the following key components:
   - `database.py`: SQLAlchemy models (GenerationRecord, DatasetItem, CostRecord, QualityValidation)
   - `config.py`: Settings using pydantic-settings with environment-based configuration
 
-### Frontend (Next.js + React + TypeScript)
+### Frontend Architecture (Separated Containers)
+#### Landing Page (Marketing/Home Page)
+- **Purpose**: Product marketing, features showcase, and user acquisition
+- **Framework**: Next.js 14 with React 18 (App Router)
+- **Location**: `./landing/` directory
+- **Port**: 3001 (http://localhost:3001)
+- **Features**: Hero section, feature highlights, pricing comparison, call-to-action
+
+#### Frontend Application (Main Application)  
+- **Purpose**: Core data generation, analysis, and management functionality
 - **Framework**: Next.js 14 with React 18 (App Router)
 - **Language**: TypeScript with strict configuration
 - **Styling**: Tailwind CSS with custom configurations
@@ -30,17 +39,20 @@ This is a full-stack application with the following key components:
 - **State Management**: React Query v3 for server state, React Hook Form for forms
 - **UI Libraries**: Recharts for analytics, React Hot Toast for notifications
 - **Location**: `./frontend/` directory
+- **Port**: 3000 (http://localhost:3000)
 - **Key Pages**: `/generate`, `/datasets`, `/analytics` (App Router structure)
+- **Default Behavior**: Redirects to `/generate` as the main application entry point
 
 ### Knowledge Distillation System
 - **Purpose**: Teacher-student model architecture for cost optimization (70-90% cost reduction)
-- **Location**: `./distillation/` directory
+- **Location**: `./backend/distillation/` directory (integrated as backend module)
 - **Key Files**:
   - `core.py`: Core orchestrator, teacher/student models, quality validation
   - `providers.py`: Multi-provider LLM integration (OpenAI, Anthropic, Google, Local)  
   - `integration.py`: API integration layer and configuration management
   - `transfer.py`: Knowledge transfer algorithms and adaptive learning
 - **Configuration**: `./config/distillation.json`
+- **Import**: Used via `from backend.distillation import ...` in FastAPI routes
 
 ## Development Commands
 
@@ -49,23 +61,30 @@ This is a full-stack application with the following key components:
 # Start full development environment with hot reload
 ./start-dev.sh
 
-# Alternative: Start individual services
+# Basic services only (database, Redis)
+./start-dev-basic.sh
+
+# Alternative: Manual Docker commands
 docker-compose -f docker-compose.dev.yml up -d postgres redis  # Basic services
 docker-compose -f docker-compose.dev.yml up -d --build          # Full services
 ```
 
 ### Starting Production Environment
 ```bash
-# Start production environment
+# Standard production mode
 ./start-prod.sh
-# OR
-docker-compose up -d
 
-# With monitoring (Prometheus + Grafana)
-docker-compose --profile monitoring up -d
+# Production with monitoring
+./start-prod.sh monitor
 
-# With background tasks (Celery)
-docker-compose --profile background-tasks up -d
+# Full production with Nginx
+./start-prod.sh prod
+
+# Manual Docker commands
+docker-compose up -d                                        # Standard
+docker-compose --profile monitoring up -d                   # With monitoring
+docker-compose --profile background-tasks up -d             # With Celery
+docker-compose --profile production up -d                   # With Nginx
 ```
 
 ### Backend Development
@@ -93,22 +112,19 @@ pytest --cov=app         # With coverage
 
 ### Frontend Development
 ```bash
+# Main application frontend
 cd frontend
-
-# Install dependencies
 npm install
+npm run dev              # Development server (port 3000)
+npm run build           # Production build
+npm run type-check      # TypeScript checking
+npm run lint            # ESLint
 
-# Development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Type checking
-npm run type-check
-
-# Linting
-npm run lint
+# Landing page
+cd landing
+npm install
+npm run dev              # Development server (port 3001)
+npm run build           # Production build
 ```
 
 ### Service Management
@@ -121,14 +137,17 @@ docker-compose -f docker-compose.dev.yml ps
 docker-compose logs -f [service_name]
 docker-compose -f docker-compose.dev.yml logs -f backend
 
-# Stop all services
+# Stop development services
 ./stop-dev.sh
-# OR
-docker-compose down
-docker-compose -f docker-compose.dev.yml down
+./stop-dev.sh clean      # Stop and clean data
+
+# Manual stop commands
+docker-compose down                           # Stop production
+docker-compose -f docker-compose.dev.yml down # Stop development
 
 # Restart specific service
 docker-compose restart backend
+docker-compose -f docker-compose.dev.yml restart backend
 ```
 
 ## Environment Configuration
@@ -229,12 +248,15 @@ The distillation system implements a sophisticated teacher-student learning fram
 
 ### Data Models & Storage
 - **SQLAlchemy Models** (`backend/database.py`):
-  - `GenerationRecord`: Tracks generation requests, costs, quality metrics, metadata
+  - `GenerationRecord`: Tracks generation requests, costs, quality metrics, extra_metadata
   - `DatasetItem`: Individual data items with content, quality scores, validation status
   - `CostRecord`: Detailed cost tracking per provider/model with token usage
   - `QualityValidation`: Validation results with quality breakdowns and recommendations
 - **Pydantic Models** (`backend/models.py`): API request/response validation with strict typing
-- **IMPORTANT**: Avoid reserved field names like `metadata` (use `extra_metadata`) and `model_*` prefixes
+- **CRITICAL**: Never use reserved field names:
+  - Use `extra_metadata` instead of `metadata` (SQLAlchemy reserved)
+  - Use `models_used` instead of `model_used` (Pydantic v2 protected namespace)
+  - Use `recommendation_list` instead of `model_recommendations`
 
 ## Testing Strategy
 
@@ -267,13 +289,14 @@ The system supports multiple deployment configurations via Docker Compose profil
 ## API Documentation
 
 - **Development**: http://localhost:8000/docs (FastAPI auto-generated)
-- **Health Check**: http://localhost:8000/api/system/status
-- **Frontend**: http://localhost:3000
+- **Health Check**: http://localhost:8000/api/health
+- **Landing Page**: http://localhost:3001 (Marketing/Home)
+- **Frontend Application**: http://localhost:3000 (Main Application)
 
 ## Common Development Tasks
 
 ### Adding New LLM Provider
-1. Implement provider class in `distillation/providers.py` extending `LLMProvider`
+1. Implement provider class in `backend/distillation/providers.py` extending `LLMProvider`
 2. Add provider to `ProviderFactory.PROVIDER_MAP` 
 3. Update `config/distillation.json` with new provider configuration
 4. Add pricing information and role suitability scoring
@@ -281,8 +304,8 @@ The system supports multiple deployment configurations via Docker Compose profil
 
 ### Modifying Distillation Strategy
 1. Update distillation configuration in `config/distillation.json`
-2. Implement strategy in `distillation/transfer.py` or `distillation/core.py`
-3. Update `DistillationStrategy` enum in `distillation/core.py`
+2. Implement strategy in `backend/distillation/transfer.py` or `backend/distillation/core.py`
+3. Update `DistillationStrategy` enum in `backend/distillation/core.py`
 4. Add quality metrics and validation in `QualityValidator` class
 5. Test with different teacher-student combinations
 
@@ -327,7 +350,7 @@ Cost estimation and tracking includes:
 ## Troubleshooting
 
 ### Common Issues
-- **Port conflicts**: Ensure ports 3000, 8000, 5432, 6379 are available
+- **Port conflicts**: Ensure ports 3000 (frontend), 3001 (landing), 8000 (backend), 5432 (postgres), 6379 (redis) are available
 - **API key errors**: Verify LLM provider API keys in `.env`
 - **Database connection**: Check PostgreSQL container health and credentials
 - **Memory issues**: Increase Docker memory limits for large dataset processing
@@ -345,5 +368,5 @@ docker-compose exec postgres pg_isready -U postgres
 docker-compose exec redis redis-cli ping
 
 # API health check
-curl http://localhost:8000/api/system/status
+curl http://localhost:8000/api/health
 ```
