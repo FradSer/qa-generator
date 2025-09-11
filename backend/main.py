@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 import json
+import io
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import uuid
@@ -24,7 +25,7 @@ from backend.distillation import (
     OptimizationStrategy
 )
 
-from .models import (
+from backend.models import (
     GenerationRequest,
     GenerationResponse,
     DatasetExportRequest,
@@ -32,14 +33,14 @@ from .models import (
     CostAnalysis,
     QualityMetrics
 )
-from .database import get_database, DatasetRepository, GenerationRepository
-from .services import (
+from backend.database import get_database, DatasetRepository, GenerationRepository
+from backend.services import (
     DatasetService,
     QualityService,
     CostService,
     ExportService
 )
-from .config import get_settings
+from backend.config import get_settings
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -155,8 +156,8 @@ async def generate_dataset(
             quality_score=result["quality_score"],
             cost=result["cost"],
             generation_time=result["generation_time"],
-            model_used=result["model_used"],
-            metadata=result["metadata"],
+            models_used=result.get("models_used", result.get("model_used", "unknown")),
+            metadata=result.get("metadata", {}),
             created_at=datetime.now()
         )
         
@@ -366,34 +367,10 @@ async def get_supported_data_types():
                 "examples": ["客服问答", "知识库问答", "对话系统训练"]
             },
             {
-                "id": "classification",
-                "name": "文本分类",
-                "description": "新闻分类、情感分析、意图识别",
-                "examples": ["情感分析", "主题分类", "意图识别"]
-            },
-            {
-                "id": "generation",
-                "name": "文本生成",
-                "description": "创意写作、产品描述、代码注释",
-                "examples": ["产品描述", "广告文案", "技术文档"]
-            },
-            {
-                "id": "code",
-                "name": "代码生成",
-                "description": "编程问题和解答、代码补全",
-                "examples": ["算法实现", "代码解释", "调试帮助"]
-            },
-            {
                 "id": "translation",
                 "name": "翻译对",
                 "description": "多语言翻译训练数据",
                 "examples": ["中英翻译", "多语言对话", "文档翻译"]
-            },
-            {
-                "id": "ner",
-                "name": "实体识别",
-                "description": "实体识别、关系抽取、信息提取",
-                "examples": ["人名识别", "地名提取", "关系抽取"]
             }
         ]
     }

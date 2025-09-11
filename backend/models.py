@@ -8,15 +8,25 @@ from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 from enum import Enum
 
-
-class DataType(str, Enum):
-    """支持的数据类型"""
-    QA = "qa"
-    CLASSIFICATION = "classification"
-    GENERATION = "generation"
-    CODE = "code"
-    TRANSLATION = "translation"
-    NER = "ner"
+# Import unified configuration from shared module
+try:
+    from shared.config import DataType as SharedDataType, OptimizationLevel as SharedOptimizationLevel
+    # Use shared enums
+    DataType = SharedDataType
+    OptimizationLevel = SharedOptimizationLevel
+except ImportError:
+    # Fallback to local definitions if shared module not available
+    class DataType(str, Enum):
+        """支持的数据类型"""
+        QA = "qa"
+        TRANSLATION = "translation"
+    
+    class OptimizationLevel(str, Enum):
+        """优化级别"""
+        COST_FIRST = "cost_first"
+        QUALITY_FIRST = "quality_first"
+        BALANCED = "balanced"
+        ADAPTIVE = "adaptive"
 
 
 class ExportFormat(str, Enum):
@@ -28,14 +38,6 @@ class ExportFormat(str, Enum):
     OPENAI = "openai_jsonl"
     PYTORCH = "pytorch"
     TENSORFLOW = "tensorflow"
-
-
-class OptimizationLevel(str, Enum):
-    """优化级别"""
-    COST_FIRST = "cost_first"
-    QUALITY_FIRST = "quality_first"
-    BALANCED = "balanced"
-    ADAPTIVE = "adaptive"
 
 
 class GenerationRequest(BaseModel):
